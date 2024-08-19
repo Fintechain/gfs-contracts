@@ -1,34 +1,48 @@
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
+import "../../interfaces/IAccountManager.sol";
+import "../../interfaces/ITransactionManager.sol";
+import "../../interfaces/IParticipantRegistry.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract TransactionManager is ITransactionManager, AccessControl, Pausable, ReentrancyGuard {
-    using Counters for Counters.Counter;
+contract TransactionManager is Initializable, ITransactionManager, AccessControlUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
+    using CountersUpgradeable for CountersUpgradeable.Counter;
 
     bytes32 public constant PROCESSOR_ROLE = keccak256("PROCESSOR_ROLE");
 
     IParticipantRegistry private participantRegistry;
-    IBalanceAndLiquidityManager private balanceManager;
+    IAccountManager private balanceManager;
 
     mapping(bytes32 => Transaction) private transactions;
     mapping(bytes32 => bytes32[]) private batches;
 
     bytes32[] private transactionQueue;
-    Counters.Counter private transactionCounter;
+    CountersUpgradeable.Counter private transactionCounter;
 
     event TransactionSubmitted(bytes32 indexed transactionId, address indexed from, address indexed to, uint256 amount, bytes32 currency);
     event TransactionStatusUpdated(bytes32 indexed transactionId, TransactionStatus newStatus);
     event BatchCreated(bytes32 indexed batchId, uint256 transactionCount);
     event BatchSettled(bytes32 indexed batchId);
 
-    constructor(address _participantRegistry, address _balanceManager) {
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setupRole(PROCESSOR_ROLE, msg.sender);
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address _participantRegistry, address _balanceManager) public initializer {
+        __AccessControl_init();
+        __Pausable_init();
+        __ReentrancyGuard_init();
+
         participantRegistry = IParticipantRegistry(_participantRegistry);
         balanceManager = IBalanceAndLiquidityManager(_balanceManager);
+
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _setupRole(PROCESSOR_ROLE, msg.sender);
     }
 
     modifier onlyProcessor() {

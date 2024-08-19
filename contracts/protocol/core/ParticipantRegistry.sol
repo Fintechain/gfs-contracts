@@ -1,26 +1,36 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
+import "../../interfaces/IParticipantRegistry.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
 
-contract ParticipantRegistry is IParticipantRegistry, AccessControl, Pausable {
-    using Counters for Counters.Counter;
+contract ParticipantRegistry is Initializable, AccessControlUpgradeable, PausableUpgradeable, IParticipantRegistry {
+    using CountersUpgradeable for CountersUpgradeable.Counter;
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
     mapping(address => Participant) private participants;
-    Counters.Counter private participantCount;
-
+    CountersUpgradeable.Counter private participantCount;
     address[] private participantAddresses;
 
     event ParticipantRegistered(address indexed participantAddress, string name);
     event ParticipantStatusUpdated(address indexed participantAddress, ParticipantStatus newStatus);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setupRole(ADMIN_ROLE, msg.sender);
+        _disableInitializers();
+    }
+
+    function initialize(address admin) public initializer {
+        __AccessControl_init();
+        __Pausable_init();
+
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(ADMIN_ROLE, admin);
     }
 
     modifier onlyAdminOrManager() {
@@ -74,8 +84,6 @@ contract ParticipantRegistry is IParticipantRegistry, AccessControl, Pausable {
         return participantCount.current();
     }
 
-    // Additional helper functions
-
     function getAllParticipants() external view returns (Participant[] memory) {
         Participant[] memory allParticipants = new Participant[](participantCount.current());
         for (uint i = 0; i < participantCount.current(); i++) {
@@ -87,8 +95,6 @@ contract ParticipantRegistry is IParticipantRegistry, AccessControl, Pausable {
     function isActiveParticipant(address participantAddress) public view returns (bool) {
         return participants[participantAddress].status == ParticipantStatus.Active;
     }
-
-    // Admin functions
 
     function pause() external onlyRole(ADMIN_ROLE) {
         _pause();

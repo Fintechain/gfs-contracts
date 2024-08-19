@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+//import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
+import "../../interfaces/IAccountManager.sol";
 
-contract AccountManager is IAccountManager, AccessControl, ReentrancyGuard {
-    using SafeMath for uint256;
+contract AccountManager is Initializable, IAccountManager, AccessControlUpgradeable, ReentrancyGuardUpgradeable {
+    //using SafeMathUpgradeable for uint256;
 
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
@@ -23,9 +25,17 @@ contract AccountManager is IAccountManager, AccessControl, ReentrancyGuard {
     event LiquidityReserved(address indexed owner, bytes32 indexed currency, uint256 amount);
     event LiquidityReleased(address indexed owner, bytes32 indexed currency, uint256 amount);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setupRole(MANAGER_ROLE, msg.sender);
+        _disableInitializers();
+    }
+
+    function initialize(address admin) public initializer {
+        __AccessControl_init();
+        __ReentrancyGuard_init();
+
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(MANAGER_ROLE, admin);
     }
 
     modifier onlyManager() {
@@ -50,11 +60,28 @@ contract AccountManager is IAccountManager, AccessControl, ReentrancyGuard {
         emit AccountCreated(msg.sender, currency);
     }
 
-    function getBalance(address owner, bytes32 currency) external view override accountExists(owner, currency) returns (uint256) {
+    function getBalance(address owner, bytes32 currency) 
+        external 
+        view 
+        override 
+        accountExists(owner, currency) 
+        returns (uint256) 
+    {
         return accounts[owner][currency].balance;
     }
 
-    function updateBalance(address owner, bytes32 currency, uint256 amount, bool isCredit) external override onlyManager nonReentrant accountExists(owner, currency) {
+    function updateBalance(
+        address owner, 
+        bytes32 currency, 
+        uint256 amount, 
+        bool isCredit
+    ) 
+        external 
+        override 
+        onlyManager 
+        nonReentrant 
+        accountExists(owner, currency) 
+    {
         Account storage account = accounts[owner][currency];
 
         if (isCredit) {
@@ -67,7 +94,17 @@ contract AccountManager is IAccountManager, AccessControl, ReentrancyGuard {
         emit BalanceUpdated(owner, currency, account.balance);
     }
 
-    function reserveLiquidity(address owner, bytes32 currency, uint256 amount) external override onlyManager nonReentrant accountExists(owner, currency) {
+    function reserveLiquidity(
+        address owner, 
+        bytes32 currency, 
+        uint256 amount
+    ) 
+        external 
+        override 
+        onlyManager 
+        nonReentrant 
+        accountExists(owner, currency) 
+    {
         Account storage account = accounts[owner][currency];
 
         uint256 availableLiquidity = account.balance.sub(account.reservedLiquidity);
@@ -78,7 +115,17 @@ contract AccountManager is IAccountManager, AccessControl, ReentrancyGuard {
         emit LiquidityReserved(owner, currency, amount);
     }
 
-    function releaseLiquidity(address owner, bytes32 currency, uint256 amount) external override onlyManager nonReentrant accountExists(owner, currency) {
+    function releaseLiquidity(
+        address owner, 
+        bytes32 currency, 
+        uint256 amount
+    ) 
+        external 
+        override 
+        onlyManager 
+        nonReentrant 
+        accountExists(owner, currency) 
+    {
         Account storage account = accounts[owner][currency];
 
         require(account.reservedLiquidity >= amount, "Insufficient reserved liquidity");
@@ -88,7 +135,13 @@ contract AccountManager is IAccountManager, AccessControl, ReentrancyGuard {
         emit LiquidityReleased(owner, currency, amount);
     }
 
-    function getAvailableLiquidity(address owner, bytes32 currency) external view override accountExists(owner, currency) returns (uint256) {
+    function getAvailableLiquidity(address owner, bytes32 currency) 
+        external 
+        view 
+        override 
+        accountExists(owner, currency) 
+        returns (uint256) 
+    {
         Account storage account = accounts[owner][currency];
         return account.balance.sub(account.reservedLiquidity);
     }

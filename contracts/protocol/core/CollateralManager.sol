@@ -1,12 +1,15 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "../../interfaces/ICollateralManager.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-contract CollateralManager is ICollateralManager, AccessControl, ReentrancyGuard {
-    using SafeERC20 for IERC20;
+contract CollateralManager is Initializable, ICollateralManager, AccessControlUpgradeable, ReentrancyGuardUpgradeable {
+    using SafeERC20Upgradeable for IERC20Upgradeable;
 
     bytes32 public constant UPDATER_ROLE = keccak256("UPDATER_ROLE");
 
@@ -23,9 +26,17 @@ contract CollateralManager is ICollateralManager, AccessControl, ReentrancyGuard
     event CollateralValueUpdated(address indexed owner, bytes32 indexed assetType, uint256 newValue);
     event AssetTypeAdded(bytes32 indexed assetType, address assetAddress);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setupRole(UPDATER_ROLE, msg.sender);
+        _disableInitializers();
+    }
+
+    function initialize(address admin) public initializer {
+        __AccessControl_init();
+        __ReentrancyGuard_init();
+
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(UPDATER_ROLE, admin);
     }
 
     function addAssetType(bytes32 assetType, address assetAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -38,7 +49,7 @@ contract CollateralManager is ICollateralManager, AccessControl, ReentrancyGuard
         require(assetAddresses[assetType] != address(0), "Invalid asset type");
         require(amount > 0, "Amount must be greater than 0");
 
-        IERC20 token = IERC20(assetAddresses[assetType]);
+        IERC20Upgradeable token = IERC20Upgradeable(assetAddresses[assetType]);
         uint256 balanceBefore = token.balanceOf(address(this));
         token.safeTransferFrom(msg.sender, address(this), amount);
         uint256 balanceAfter = token.balanceOf(address(this));
@@ -56,13 +67,21 @@ contract CollateralManager is ICollateralManager, AccessControl, ReentrancyGuard
 
         collaterals[msg.sender][assetType].amount -= amount;
 
-        IERC20 token = IERC20(assetAddresses[assetType]);
+        IERC20Upgradeable token = IERC20Upgradeable(assetAddresses[assetType]);
         token.safeTransfer(msg.sender, amount);
 
         emit CollateralWithdrawn(msg.sender, assetType, amount);
     }
 
-    function updateCollateralValue(address owner, bytes32 assetType, uint256 newValue) external override onlyRole(UPDATER_ROLE) {
+    function updateCollateralValue(
+        address owner, 
+        bytes32 assetType, 
+        uint256 newValue
+    ) 
+        external 
+        override 
+        onlyRole(UPDATER_ROLE) 
+    {
         require(assetAddresses[assetType] != address(0), "Invalid asset type");
         collaterals[owner][assetType].valueInBaseCurrency = newValue;
         emit CollateralValueUpdated(owner, assetType, newValue);

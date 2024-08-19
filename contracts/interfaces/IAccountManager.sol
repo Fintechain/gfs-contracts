@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
  * @title IBalanceAndLiquidityManager
  * @dev Interface for managing balances and liquidity within the RTGS system.
  */
-interface IBalanceAndLiquidityManager {
+interface IAccountManager {
 
     /**
      * @dev Creates an account for the specified currency.
