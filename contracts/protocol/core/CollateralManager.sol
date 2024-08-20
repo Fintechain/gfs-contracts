@@ -5,11 +5,11 @@ import "../../interfaces/ICollateralManager.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract CollateralManager is Initializable, ICollateralManager, AccessControlUpgradeable, ReentrancyGuardUpgradeable {
-    using SafeERC20Upgradeable for IERC20Upgradeable;
+    using SafeERC20 for IERC20;
 
     bytes32 public constant UPDATER_ROLE = keccak256("UPDATER_ROLE");
 
@@ -49,7 +49,7 @@ contract CollateralManager is Initializable, ICollateralManager, AccessControlUp
         require(assetAddresses[assetType] != address(0), "Invalid asset type");
         require(amount > 0, "Amount must be greater than 0");
 
-        IERC20Upgradeable token = IERC20Upgradeable(assetAddresses[assetType]);
+        IERC20 token = IERC20(assetAddresses[assetType]);
         uint256 balanceBefore = token.balanceOf(address(this));
         token.safeTransferFrom(msg.sender, address(this), amount);
         uint256 balanceAfter = token.balanceOf(address(this));
@@ -67,7 +67,7 @@ contract CollateralManager is Initializable, ICollateralManager, AccessControlUp
 
         collaterals[msg.sender][assetType].amount -= amount;
 
-        IERC20Upgradeable token = IERC20Upgradeable(assetAddresses[assetType]);
+        IERC20 token = IERC20(assetAddresses[assetType]);
         token.safeTransfer(msg.sender, amount);
 
         emit CollateralWithdrawn(msg.sender, assetType, amount);

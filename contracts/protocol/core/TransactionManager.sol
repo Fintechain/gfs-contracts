@@ -6,11 +6,10 @@ import "../../interfaces/IParticipantRegistry.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract TransactionManager is Initializable, ITransactionManager, AccessControlUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
-    using CountersUpgradeable for CountersUpgradeable.Counter;
 
     bytes32 public constant PROCESSOR_ROLE = keccak256("PROCESSOR_ROLE");
 
@@ -21,7 +20,7 @@ contract TransactionManager is Initializable, ITransactionManager, AccessControl
     mapping(bytes32 => bytes32[]) private batches;
 
     bytes32[] private transactionQueue;
-    CountersUpgradeable.Counter private transactionCounter;
+    uint256 private transactionCounter;
 
     event TransactionSubmitted(bytes32 indexed transactionId, address indexed from, address indexed to, uint256 amount, bytes32 currency);
     event TransactionStatusUpdated(bytes32 indexed transactionId, TransactionStatus newStatus);
@@ -39,10 +38,10 @@ contract TransactionManager is Initializable, ITransactionManager, AccessControl
         __ReentrancyGuard_init();
 
         participantRegistry = IParticipantRegistry(_participantRegistry);
-        balanceManager = IBalanceAndLiquidityManager(_balanceManager);
+        balanceManager = IAccountManager(_balanceManager);
 
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setupRole(PROCESSOR_ROLE, msg.sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(PROCESSOR_ROLE, msg.sender);
     }
 
     modifier onlyProcessor() {
@@ -62,7 +61,7 @@ contract TransactionManager is Initializable, ITransactionManager, AccessControl
         require(amount > 0, "Amount must be greater than zero");
 
         bytes32 transactionId = keccak256(abi.encodePacked(msg.sender, to, amount, currency, block.timestamp, transactionCounter.current()));
-        transactionCounter.increment();
+        incrementCounter();
 
         Transaction memory newTransaction = Transaction({
             id: transactionId,
@@ -191,5 +190,14 @@ contract TransactionManager is Initializable, ITransactionManager, AccessControl
 
     function removeProcessor(address processor) external onlyRole(DEFAULT_ADMIN_ROLE) {
         revokeRole(PROCESSOR_ROLE, processor);
+    }
+    
+    function getCurrentCount() public view returns (uint256) {
+        return transactionCounter;
+    }
+    function incrementCounter() internal returns (uint256) {
+        unchecked {
+            return ++transactionCounter;
+        }
     }
 }

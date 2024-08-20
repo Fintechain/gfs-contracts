@@ -6,9 +6,11 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 //import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "../../interfaces/IAccountManager.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract AccountManager is Initializable, IAccountManager, AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     //using SafeMathUpgradeable for uint256;
+    using Math for uint256;
 
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
@@ -85,10 +87,10 @@ contract AccountManager is Initializable, IAccountManager, AccessControlUpgradea
         Account storage account = accounts[owner][currency];
 
         if (isCredit) {
-            account.balance = account.balance.add(amount);
+            (, account.balance) = account.balance.tryAdd(amount);
         } else {
             require(account.balance >= amount, "Insufficient balance");
-            account.balance = account.balance.sub(amount);
+            (, account.balance) = account.balance.trySub(amount);
         }
 
         emit BalanceUpdated(owner, currency, account.balance);
@@ -107,10 +109,10 @@ contract AccountManager is Initializable, IAccountManager, AccessControlUpgradea
     {
         Account storage account = accounts[owner][currency];
 
-        uint256 availableLiquidity = account.balance.sub(account.reservedLiquidity);
+        (, uint256 availableLiquidity) = account.balance.trySub(account.reservedLiquidity);
         require(availableLiquidity >= amount, "Insufficient available liquidity");
 
-        account.reservedLiquidity = account.reservedLiquidity.add(amount);
+        (, account.reservedLiquidity) = account.reservedLiquidity.tryAdd(amount);
 
         emit LiquidityReserved(owner, currency, amount);
     }
@@ -130,7 +132,7 @@ contract AccountManager is Initializable, IAccountManager, AccessControlUpgradea
 
         require(account.reservedLiquidity >= amount, "Insufficient reserved liquidity");
 
-        account.reservedLiquidity = account.reservedLiquidity.sub(amount);
+        (, account.reservedLiquidity) = account.reservedLiquidity.trySub(amount);
 
         emit LiquidityReleased(owner, currency, amount);
     }
@@ -140,9 +142,10 @@ contract AccountManager is Initializable, IAccountManager, AccessControlUpgradea
         view 
         override 
         accountExists(owner, currency) 
-        returns (uint256) 
+        returns (uint256 amount) 
     {
         Account storage account = accounts[owner][currency];
-        return account.balance.sub(account.reservedLiquidity);
+        (, amount) = account.balance.trySub(account.reservedLiquidity);
+        return amount;
     }
 }

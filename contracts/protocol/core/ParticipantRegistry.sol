@@ -5,16 +5,14 @@ import "../../interfaces/IParticipantRegistry.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
 
 contract ParticipantRegistry is Initializable, AccessControlUpgradeable, PausableUpgradeable, IParticipantRegistry {
-    using CountersUpgradeable for CountersUpgradeable.Counter;
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
     mapping(address => Participant) private participants;
-    CountersUpgradeable.Counter private participantCount;
+    uint256 private participantCount;
     address[] private participantAddresses;
 
     event ParticipantRegistered(address indexed participantAddress, string name);
@@ -51,7 +49,7 @@ contract ParticipantRegistry is Initializable, AccessControlUpgradeable, Pausabl
 
         participants[msg.sender] = newParticipant;
         participantAddresses.push(msg.sender);
-        participantCount.increment();
+        incrementParticipantCounter();
 
         emit ParticipantRegistered(msg.sender, name);
     }
@@ -81,12 +79,12 @@ contract ParticipantRegistry is Initializable, AccessControlUpgradeable, Pausabl
     }
 
     function getParticipantCount() external view override returns (uint256) {
-        return participantCount.current();
+        return participantCount;
     }
 
     function getAllParticipants() external view returns (Participant[] memory) {
-        Participant[] memory allParticipants = new Participant[](participantCount.current());
-        for (uint i = 0; i < participantCount.current(); i++) {
+        Participant[] memory allParticipants = new Participant[](participantCount);
+        for (uint i = 0; i < participantCount; i++) {
             allParticipants[i] = participants[participantAddresses[i]];
         }
         return allParticipants;
@@ -110,5 +108,10 @@ contract ParticipantRegistry is Initializable, AccessControlUpgradeable, Pausabl
 
     function removeManager(address manager) external onlyRole(ADMIN_ROLE) {
         revokeRole(MANAGER_ROLE, manager);
+    }
+    function incrementParticipantCounter() internal returns (uint256) {
+        unchecked {
+            return ++participantCount;
+        }
     }
 }
