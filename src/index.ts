@@ -1,0 +1,1 @@
+export const LOG_DEPLOYMENTS = true;

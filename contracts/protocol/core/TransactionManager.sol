@@ -141,6 +141,9 @@ contract TransactionManager is Initializable, ITransactionManager, AccessControl
             Transaction storage transaction = transactions[transactionId];
 
             if (transaction.status == TransactionStatus.Queued) {
+                /**
+                 * TODO: Make this function work with requirement for isCredit parameter 
+                 */
                 balanceManager.updateBalance(transaction.from, transaction.currency, transaction.amount, true);
                 transaction.status = TransactionStatus.Settled;
                 emit TransactionStatusUpdated(transactionId, TransactionStatus.Settled);
