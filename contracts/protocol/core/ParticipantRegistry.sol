@@ -90,7 +90,7 @@ contract ParticipantRegistry is Initializable, AccessControlUpgradeable, Pausabl
         return allParticipants;
     }
 
-    function isActiveParticipant(address participantAddress) public view returns (bool) {
+    function isActiveParticipant(address participantAddress) external view returns (bool) {
         return participants[participantAddress].status == ParticipantStatus.Active;
     }
 

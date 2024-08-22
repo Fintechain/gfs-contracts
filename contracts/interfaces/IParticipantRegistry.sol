@@ -50,4 +50,10 @@ interface IParticipantRegistry {
      * @return The number of participants.
      */
     function getParticipantCount() external view returns (uint256);
+
+    /**
+     * @dev Returns true if the status of the given address is active
+     * @param participantAddress The address of the participant
+     */
+    function isActiveParticipant(address participantAddress) external view returns (bool);
 }

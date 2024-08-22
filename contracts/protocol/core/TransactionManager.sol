@@ -13,8 +13,8 @@ contract TransactionManager is Initializable, ITransactionManager, AccessControl
 
     bytes32 public constant PROCESSOR_ROLE = keccak256("PROCESSOR_ROLE");
 
-    IParticipantRegistry private participantRegistry;
     IAccountManager private balanceManager;
+    IParticipantRegistry private participantRegistry;
 
     mapping(bytes32 => Transaction) private transactions;
     mapping(bytes32 => bytes32[]) private batches;
@@ -60,7 +60,7 @@ contract TransactionManager is Initializable, ITransactionManager, AccessControl
         require(participantRegistry.isActiveParticipant(to), "Recipient is not an active participant");
         require(amount > 0, "Amount must be greater than zero");
 
-        bytes32 transactionId = keccak256(abi.encodePacked(msg.sender, to, amount, currency, block.timestamp, transactionCounter.current()));
+        bytes32 transactionId = keccak256(abi.encodePacked(msg.sender, to, amount, currency, block.timestamp, transactionCounter));
         incrementCounter();
 
         Transaction memory newTransaction = Transaction({
@@ -90,6 +90,8 @@ contract TransactionManager is Initializable, ITransactionManager, AccessControl
 
         require(transaction.status == TransactionStatus.Pending, "Transaction is not pending");
 
+        balanceManager.reserveLiquidity(transaction.from, transaction.currency, transaction.amount);
+       /*  
         bool success = balanceManager.reserveLiquidity(transaction.from, transaction.currency, transaction.amount);
         if (success) {
             transaction.status = TransactionStatus.Queued;
@@ -97,7 +99,7 @@ contract TransactionManager is Initializable, ITransactionManager, AccessControl
         } else {
             transaction.status = TransactionStatus.Failed;
             emit TransactionStatusUpdated(transactionId, TransactionStatus.Failed);
-        }
+        } */
 
         // Remove the processed transaction from the queue
         transactionQueue[0] = transactionQueue[transactionQueue.length - 1];
@@ -139,7 +141,7 @@ contract TransactionManager is Initializable, ITransactionManager, AccessControl
             Transaction storage transaction = transactions[transactionId];
 
             if (transaction.status == TransactionStatus.Queued) {
-                balanceManager.updateBalance(transaction.from, transaction.to, transaction.currency, transaction.amount);
+                balanceManager.updateBalance(transaction.from, transaction.currency, transaction.amount, true);
                 transaction.status = TransactionStatus.Settled;
                 emit TransactionStatusUpdated(transactionId, TransactionStatus.Settled);
             }
