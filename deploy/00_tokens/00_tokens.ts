@@ -1,6 +1,6 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
-import { LOG_DEPLOYMENTS } from "../../../src";
+import { LOG_DEPLOYMENTS } from "../../src";
 
 const func: DeployFunction = async function ({
     getNamedAccounts,

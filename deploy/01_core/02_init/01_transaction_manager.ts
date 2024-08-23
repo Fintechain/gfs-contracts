@@ -8,7 +8,7 @@ const func: DeployFunction = async function ({
     ...hre
 }: HardhatRuntimeEnvironment) {
     const { execute } = deployments;
-    const { deployer } = await getNamedAccounts();
+    const { deployer, platformAdmin } = await getNamedAccounts();
 
     const accountManagerDeployment = await deployments.get("AccountManager");
     const participantRegistry = await deployments.get("ParticipantRegistry");
@@ -16,7 +16,7 @@ const func: DeployFunction = async function ({
     // Initialize ContractA with ContractB's address
     await execute(
         "TransactionManager", { from: deployer, log: true },
-        "initialize", participantRegistry.address, accountManagerDeployment.address
+        "initialize", platformAdmin, participantRegistry.address, accountManagerDeployment.address
     );
 
     return true;

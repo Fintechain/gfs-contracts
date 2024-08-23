@@ -32,7 +32,7 @@ contract TransactionManager is Initializable, ITransactionManager, AccessControl
         _disableInitializers();
     }
 
-    function initialize(address _participantRegistry, address _balanceManager) public initializer {
+    function initialize(address admin, address _participantRegistry, address _balanceManager) public initializer {
         __AccessControl_init();
         __Pausable_init();
         __ReentrancyGuard_init();
@@ -40,8 +40,8 @@ contract TransactionManager is Initializable, ITransactionManager, AccessControl
         participantRegistry = IParticipantRegistry(_participantRegistry);
         balanceManager = IAccountManager(_balanceManager);
 
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(PROCESSOR_ROLE, msg.sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(PROCESSOR_ROLE, admin);
     }
 
     modifier onlyProcessor() {
@@ -190,7 +190,7 @@ contract TransactionManager is Initializable, ITransactionManager, AccessControl
     }
 
     function addProcessor(address processor) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        grantRole(PROCESSOR_ROLE, processor);
+        _grantRole(PROCESSOR_ROLE, processor);
     }
 
     function removeProcessor(address processor) external onlyRole(DEFAULT_ADMIN_ROLE) {

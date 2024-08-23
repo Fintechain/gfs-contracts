@@ -19,6 +19,10 @@ const config: HardhatUserConfig = {
     namedAccounts: {
         deployer: 0,
         platformAdmin: 1,
+        admin: 1,
+        manager: 1,
+        user: 3,
+        user2: 4
     },
     typechain: {
         outDir: "typechain",
