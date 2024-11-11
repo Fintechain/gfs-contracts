@@ -11,24 +11,16 @@ const func: DeployFunction = async function ({
 
     const defaultAdmin = platformAdmin; // or any other address you want to set as default admin
 
-    await deploy("ParticipantRegistry", {
-        from: deployer,
-        proxy: {
-            proxyContract: "OpenZeppelinTransparentProxy",
-            execute: {
-                init: {
-                    methodName: "initialize",
-                    args: [defaultAdmin],
-                },
-            },
-        },
+    await deploy("MessageProtocol", {
+        from: platformAdmin,
+        args: [],
         log: true,
     });
 
     return true;
 };
 
-func.id = "ParticipantRegistry";
-func.tags = ["core", "ParticipantRegistry"];
+func.id = "MessageProtocol";
+func.tags = ["core", "MessageProtocol"];
 
 export default func;

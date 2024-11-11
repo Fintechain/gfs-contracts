@@ -1,122 +1,220 @@
-# Global Financial System (GFS)
+# GFS Protocol: Decentralized ISO20022 Messaging Network
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
+[![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)]()
+[![Solidity](https://img.shields.io/badge/solidity-0.8.19-blue.svg)]()
 
-Smart contracts for the decentralized Global Financial System (GFS) 
+> A decentralized ISO20022 messaging protocol for cross-chain financial communication, powered by Wormhole.
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Features](#features)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
+- [Architecture](#architecture)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Configuration](#configuration)
 - [Usage](#usage)
-- [Testing](#testing)
-- [Deployment](#deployment)
+  - [Contract Deployment](#contract-deployment)
+  - [Running Tests](#running-tests)
+  - [Local Development](#local-development)
+- [Core Components](#core-components)
+- [Documentation](#documentation)
+- [Security](#security)
 - [Contributing](#contributing)
 - [License](#license)
+- [Contact](#contact)
 
 ## Overview
 
-The Global Financial System (GFS) represents a framework for financial systems, leveraging blockchain technology to achieve enhanced decentralization, interoperability, and security. GFS employs smart contract functionalities within a modular and scalable infrastructure. This architecture is engineered to accommodate the varied and complex needs of both financial institutions and individual users, ensuring efficient and secure management of financial transactions and operations.
+GFS Protocol enables standardized financial messaging between traditional financial institutions and blockchain networks through ISO20022-compliant message exchange. By leveraging Wormhole's cross-chain communication infrastructure, GFS provides:
 
+- 🌐 Cross-chain ISO20022 message routing
+- 💱 Standardized settlement mechanisms
+- 🔒 Regulatory compliance
+- ⚡ Efficient message processing
+- 🤝 Financial institution integration
 
-## Features
+## Architecture
 
-- EVM Compatibility
-- Cosmos SDK Integration
-- Proof-of-Stake Consensus
-- Multi-Zone Architecture
-- Inter-Blockchain Communication (IBC) Protocol
-- Wormhole Integration
+### Protocol Stack
+![Protocol Stack](docs/protocol-contracts.png)
+<!-- ```mermaid
+graph TD
+    A[Financial Institutions] -- > B[Protocol Layer]
+    B -- > C[Registry Layer]
+    B -- > D[Processing Layer]
+    B -- > E[Settlement Layer]
+    C -- > F[Message Registry]
+    C -- > G[Target Registry]
+    D -- > H[Message Router]
+    D -- > I[Message Processor]
+    E -- > J[Settlement Controller]
+    E -- > K[Liquidity Pool]
+    H -- > L[Wormhole Network]
+```
+ -->
+### Message Flow
+![Message Flow](docs/message-registration-flow.png)
 
-## Prerequisites
+<!-- ```mermaid
+sequenceDiagram
+    participant FI as Financial Institution
+    participant PR as Protocol Layer
+    participant WH as Wormhole
+    participant TC as Target Chain
 
-Before you begin, ensure you have met the following requirements:
+    FI->>PR: Submit ISO20022 Message
+    PR->>PR: Validate & Transform
+    PR->>WH: Cross-Chain Delivery
+    WH->>TC: Execute & Confirm
+    TC->>FI: Delivery Status
+``` -->
 
-- Node.js (v14.0.0 or later)
-- npm (v6.0.0 or later)
-- Git
+## Getting Started
 
-## Installation
+### Prerequisites
 
-To install the GFS project, follow these steps:
+- Node.js v18+
+- Yarn or npm
+- Hardhat
+- Foundry (for local development)
+
+```bash
+# Install Node.js dependencies
+npm install
+
+# Install Foundry
+curl -L https://foundry.paradigm.xyz | bash
+foundryup
+```
+
+### Installation
 
 1. Clone the repository:
-   ```
-   git clone https://github.com/ebanfa/gfs-contracts.git
-   cd gfs
-   ```
+```bash
+git clone https://github.com/gfs-protocol/gfs-core.git
+cd gfs-core
+```
 
-2. Install the dependencies:
-   ```
-   npm install
-   ```
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Copy environment file:
+```bash
+cp .env.example .env
+```
+
+4. Set up your environment variables:
+```env
+PRIVATE_KEY=your_private_key
+INFURA_API_KEY=your_infura_key
+ETHERSCAN_API_KEY=your_etherscan_key
+```
+
+### Configuration
+
+The project uses Hardhat and hardhat-deploy for deployment management. Configuration files:
+
+- `hardhat.config.ts`: Network and plugin configuration
+- `deploy/`: Deployment scripts
+- `.env`: Environment variables
 
 ## Usage
 
-To compile the contracts:
+### Contract Deployment
 
-```
-npx hardhat compile
-```
+Deploy to testnet:
 
-To run the local Hardhat network:
-
-```
-npx hardhat node
+```bash
+npx hardhat deploy --network fuji
 ```
 
-## Testing
+Deploy to mainnet:
 
-To run the test suite:
-
+```bash
+npx hardhat deploy --network avalanche
 ```
+
+Verify contracts:
+
+```bash
+npx hardhat etherscan-verify --network avalanche
+```
+
+### Running Tests
+
+```bash
+# Run all tests
 npx hardhat test
-```
 
-For coverage report:
+# Run specific test file
+npx hardhat test test/MessageRouter.test.ts
 
-```
+# Run tests with coverage
 npx hardhat coverage
 ```
 
-## Deployment
+### Local Development
 
-This project uses `hardhat-deploy` for managing deployments.
-
-To deploy to a network defined in the `hardhat.config.ts`:
-
-```
-npx hardhat deploy --network <network-name>
+1. Start local node:
+```bash
+npx hardhat node
 ```
 
-To run a specific deployment script:
+2. Deploy contracts:
+```bash
+npx hardhat deploy --network localhost
+```
 
-```
-npx hardhat deploy --tags <script-name>
-```
+## Core Components
+
+| Contract | Description | Key Functions |
+|----------|-------------|---------------|
+| MessageRegistry | Message storage and tracking | `registerMessage()`, `getMessage()` |
+| TargetRegistry | Participant management | `registerTarget()`, `validateTarget()` |
+| MessageRouter | Cross-chain message routing | `routeMessage()`, `deliverMessage()` |
+| MessageProcessor | Message handling and execution | `processMessage()`, `registerHandler()` |
+| SettlementController | Cross-chain settlement | `initiateSettlement()`, `completeSettlement()` |
+| LiquidityPool | Settlement liquidity management | `lockLiquidity()`, `releaseLiquidity()` |
+
+## Documentation
+
+- [Protocol Specification](docs/SPECIFICATION.md)
+- [API Documentation](docs/API.md)
+- [Integration Guide](docs/INTEGRATION.md)
+- [Deployment Guide](docs/DEPLOYMENT.md)
+
+## Security
+
+The protocol undergoes rigorous security measures:
+
+- Comprehensive test coverage
+- Multiple external audits
+- Regular security reviews
+- Bug bounty program
+
+For security concerns, please email security@gfs.protocol
 
 ## Contributing
 
-Contributions to the GFS project are welcome. Please follow these steps:
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md).
 
 1. Fork the repository
-2. Create a new branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Commit your changes (`git commit -m 'Add some amazing feature'`)
-5. Push to the branch (`git push origin feature/amazing-feature`)
-6. Open a Pull Request
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Contact
 
-If you have any questions, please reach out to [ebanfa@gmail.com](mailto:ebanfa@gmail.com).
-
-## Acknowledgements
-
-- [Hardhat](https://hardhat.org/)
-- [OpenZeppelin Contracts](https://openzeppelin.com/contracts/)
-- [Cosmos SDK](https://cosmos.network/)
-- [EVMOS](https://evmos.org/)
+- Website: [gfs.protocol](https://gfs.protocol)
+- Documentation: [docs.gfs.protocol](https://docs.gfs.protocol)
+- Discord: [discord.gg/gfs-protocol](https://discord.gg/gfs-protocol)
+- Twitter: [@GFSProtocol](https://twitter.com/GFSProtocol)

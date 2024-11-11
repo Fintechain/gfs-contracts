@@ -9,24 +9,18 @@ const func: DeployFunction = async function ({
     const { deploy } = deployments;
     const { deployer, platformAdmin } = await getNamedAccounts();
 
-    await deploy("TransactionManager", {
-        from: deployer,
-        proxy: {
-            proxyContract: "OpenZeppelinTransparentProxy",
-            execute: {
-                init: {
-                    methodName: "", // No method name means no initialization
-                    args: [],
-                },
-            },
-        },
+    const defaultAdmin = platformAdmin; // or any other address you want to set as default admin
+
+    await deploy("MessageRegistry", {
+        from: platformAdmin,
+        args: [],
         log: true,
     });
 
     return true;
 };
 
-func.id = "TransactionManager";
-func.tags = ["core", "TransactionManager"];
+func.id = "MessageRegistry";
+func.tags = ["core", "MessageRegistry"];
 
 export default func;

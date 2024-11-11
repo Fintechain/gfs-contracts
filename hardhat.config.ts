@@ -22,7 +22,9 @@ const config: HardhatUserConfig = {
         admin: 1,
         manager: 1,
         user: 3,
-        user2: 4
+        user2: 4,
+        formatAdmin: 1, 
+        validator: 1
     },
     typechain: {
         outDir: "typechain",

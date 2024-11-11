@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "lib/wormhole-solidity-sdk/src/WormholeRelayerSDK.sol";
+import "../../lib/wormhole-solidity-sdk/src/WormholeRelayerSDK.sol";
+
 
 /**
  * @title ISettlementController
