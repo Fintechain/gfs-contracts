@@ -81,15 +81,11 @@ sequenceDiagram
 - Node.js v18+
 - Yarn or npm
 - Hardhat
-- Foundry (for local development)
 
 ```bash
 # Install Node.js dependencies
 npm install
 
-# Install Foundry
-curl -L https://foundry.paradigm.xyz | bash
-foundryup
 ```
 
 ### Installation
@@ -217,7 +213,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Contact
 
-- Website: [gfs.protocol](https://gfs.protocol)
-- Documentation: [docs.gfs.protocol](https://docs.gfs.protocol)
-- Discord: [discord.gg/gfs-protocol](https://discord.gg/gfs-protocol)
-- Twitter: [@GFSProtocol](https://twitter.com/GFSProtocol)
+- Website: [fintechain.com](https://fintechain.com)
+- Documentation: [fintechain.com](https://fintechain.com)
+- Twitter: [@FintechainLab](https://x.com/FintechainLab)
+- Telegram: [@fintechain](https://t.me/fintechain)
