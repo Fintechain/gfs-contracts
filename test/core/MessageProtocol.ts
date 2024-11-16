@@ -21,7 +21,7 @@ describe("MessageProtocol", function () {
         await deployments.fixture(['MessageProtocol']);
 
         // Get named accounts
-        const { platformAdmin, formatAdmin, validator } = await getNamedAccounts();
+        const { admin, formatAdmin, validator } = await getNamedAccounts();
 
         // Get the deployed contract
         const MessageProtocolDeployment = await deployments.get('MessageProtocol');
@@ -32,15 +32,15 @@ describe("MessageProtocol", function () {
         const formatAdminRole = await messageProtocol.FORMAT_ADMIN_ROLE();
         const validatorRole = await messageProtocol.VALIDATOR_ROLE();
 
-        await messageProtocol.connect(await ethers.getSigner(platformAdmin)).grantRole(protocolAdminRole, platformAdmin);
-        await messageProtocol.connect(await ethers.getSigner(platformAdmin)).grantRole(formatAdminRole, formatAdmin);
-        await messageProtocol.connect(await ethers.getSigner(platformAdmin)).grantRole(validatorRole, validator);
+        await messageProtocol.connect(await ethers.getSigner(admin)).grantRole(protocolAdminRole, admin);
+        await messageProtocol.connect(await ethers.getSigner(admin)).grantRole(formatAdminRole, formatAdmin);
+        await messageProtocol.connect(await ethers.getSigner(admin)).grantRole(validatorRole, validator);
     });
 
     describe("Deployment", function () {
         it("Should set the correct admin", async function () {
-            const { platformAdmin } = await getNamedAccounts();
-            expect(await messageProtocol.hasRole(await messageProtocol.DEFAULT_ADMIN_ROLE(), platformAdmin)).to.be.true;
+            const { admin } = await getNamedAccounts();
+            expect(await messageProtocol.hasRole(await messageProtocol.DEFAULT_ADMIN_ROLE(), admin)).to.be.true;
         });
 
         it("Should set the correct initial version", async function () {
@@ -82,7 +82,7 @@ describe("MessageProtocol", function () {
         it("Should revert if schema is empty", async function () {
             const { formatAdmin } = await getNamedAccounts();
             await expect(messageProtocol.connect(await ethers.getSigner(formatAdmin))
-                .registerMessageFormat(testMessageType, testRequiredFields, []))
+                .registerMessageFormat(testMessageType, testRequiredFields, "0x"))
                 .to.be.revertedWith("MessageProtocol: Schema cannot be empty");
         });
     });
@@ -127,8 +127,8 @@ describe("MessageProtocol", function () {
 
     describe("Protocol Version Management", function () {
         it("Should allow protocol admin to update version", async function () {
-            const { platformAdmin } = await getNamedAccounts();
-            await messageProtocol.connect(await ethers.getSigner(platformAdmin))
+            const { admin } = await getNamedAccounts();
+            await messageProtocol.connect(await ethers.getSigner(admin))
                 .updateProtocolVersion(2, 0, 0);
             
             const version = await messageProtocol.getProtocolVersion();
@@ -138,8 +138,8 @@ describe("MessageProtocol", function () {
         });
 
         it("Should emit ProtocolVersionUpdated event", async function () {
-            const { platformAdmin } = await getNamedAccounts();
-            await expect(messageProtocol.connect(await ethers.getSigner(platformAdmin))
+            const { admin } = await getNamedAccounts();
+            await expect(messageProtocol.connect(await ethers.getSigner(admin))
                 .updateProtocolVersion(2, 0, 0))
                 .to.emit(messageProtocol, "ProtocolVersionUpdated")
                 .withArgs(2, 0, 0);
@@ -237,21 +237,21 @@ describe("MessageProtocol", function () {
 
     describe("Emergency Controls", function () {
         it("Should allow protocol admin to pause", async function () {
-            const { platformAdmin } = await getNamedAccounts();
-            await messageProtocol.connect(await ethers.getSigner(platformAdmin)).pause();
+            const { admin } = await getNamedAccounts();
+            await messageProtocol.connect(await ethers.getSigner(admin)).pause();
             expect(await messageProtocol.paused()).to.be.true;
         });
 
         it("Should allow protocol admin to unpause", async function () {
-            const { platformAdmin } = await getNamedAccounts();
-            await messageProtocol.connect(await ethers.getSigner(platformAdmin)).pause();
-            await messageProtocol.connect(await ethers.getSigner(platformAdmin)).unpause();
+            const { admin } = await getNamedAccounts();
+            await messageProtocol.connect(await ethers.getSigner(admin)).pause();
+            await messageProtocol.connect(await ethers.getSigner(admin)).unpause();
             expect(await messageProtocol.paused()).to.be.false;
         });
 
         it("Should revert operations when paused", async function () {
-            const { platformAdmin, formatAdmin } = await getNamedAccounts();
-            await messageProtocol.connect(await ethers.getSigner(platformAdmin)).pause();
+            const { admin, formatAdmin } = await getNamedAccounts();
+            await messageProtocol.connect(await ethers.getSigner(admin)).pause();
             
             await expect(messageProtocol.connect(await ethers.getSigner(formatAdmin))
                 .registerMessageFormat(testMessageType, testRequiredFields, testSchema))

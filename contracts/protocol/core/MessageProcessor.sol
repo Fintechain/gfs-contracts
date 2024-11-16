@@ -113,6 +113,7 @@ contract MessageProcessor is IMessageProcessor, AccessControl, Pausable, Reentra
         );
 
         messageHandlers[messageType] = handler;
+        emit HandlerRegistered(messageType, handler, msg.sender);
     }
 
     /**

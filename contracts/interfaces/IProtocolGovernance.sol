@@ -41,6 +41,18 @@ interface IProtocolGovernance {
         bool success
     );
 
+    /// @notice Emitted when a vote is cast
+    event VoteCast(uint256 indexed proposalId, address indexed voter, bool support);
+    
+    /// @notice Emitted when emergency action is executed
+    event EmergencyActionExecuted(bytes32 indexed actionHash);
+    
+    /// @notice Emitted when voting power is updated
+    event VotingPowerUpdated(address indexed account, uint256 newPower);
+
+    /// @notice Error for unauthorized access
+    error NotAuthorized();
+
     /**
      * @notice Create a new governance proposal
      * @param proposalType Type of proposal

@@ -7,7 +7,7 @@ const func: DeployFunction = async function ({
     ethers,
     ...hre
 }: HardhatRuntimeEnvironment) {
-    const { execute } = deployments;
+    /* const { execute } = deployments;
     const { deployer, platformAdmin } = await getNamedAccounts();
 
     const accountManagerDeployment = await deployments.get("AccountManager");
@@ -17,7 +17,7 @@ const func: DeployFunction = async function ({
     await execute(
         "TransactionManager", { from: deployer, log: true },
         "initialize", platformAdmin, participantRegistry.address, accountManagerDeployment.address
-    );
+    ); */
 
     return true;
 };

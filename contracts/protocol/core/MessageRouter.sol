@@ -8,12 +8,19 @@ import "../../../lib/wormhole-solidity-sdk/src/interfaces/IWormhole.sol";
 import "../../../lib/wormhole-solidity-sdk/src/interfaces/IWormholeRelayer.sol";
 import "../../interfaces/IMessageRouter.sol";
 import "../../interfaces/ITargetRegistry.sol";
+import "../../interfaces/IMessageHandler.sol";
+import "../../interfaces/IMessageProcessor.sol";
 
 /**
  * @title MessageRouter
  * @notice Routes ISO20022 messages between chains using Wormhole protocol
  */
-contract MessageRouter is IMessageRouter, AccessControl, Pausable, ReentrancyGuard {
+contract MessageRouter is
+    IMessageRouter,
+    AccessControl,
+    Pausable,
+    ReentrancyGuard
+{
     // Role definitions
     bytes32 public constant ROUTER_ROLE = keccak256("ROUTER_ROLE");
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
@@ -26,6 +33,8 @@ contract MessageRouter is IMessageRouter, AccessControl, Pausable, ReentrancyGua
     IWormhole public immutable wormhole;
     IWormholeRelayer public immutable wormholeRelayer;
 
+    IMessageProcessor public immutable messageProcessor; // Added
+
     // Storage
     mapping(bytes32 => bytes32) private deliveryHashes;
     mapping(bytes32 => bool) private routingStatus;
@@ -33,22 +42,28 @@ contract MessageRouter is IMessageRouter, AccessControl, Pausable, ReentrancyGua
 
     // Events not in interface
     event ChainGasLimitUpdated(uint16 indexed chainId, uint256 gasLimit);
-    event DeliveryCompleted(bytes32 indexed messageId, bytes32 indexed deliveryHash);
+    event DeliveryCompleted(
+        bytes32 indexed messageId,
+        bytes32 indexed deliveryHash
+    );
 
     /**
      * @notice Contract constructor
      * @param _wormholeRelayer Wormhole relayer address
      * @param _wormhole Wormhole core contract address
      * @param _targetRegistry Target registry contract address
+     * @param _messageProcessor Message processpr contract address
      */
     constructor(
         address _wormholeRelayer,
         address _wormhole,
-        address _targetRegistry
+        address _targetRegistry,
+        address _messageProcessor
     ) {
         wormholeRelayer = IWormholeRelayer(_wormholeRelayer);
         wormhole = IWormhole(_wormhole);
         targetRegistry = ITargetRegistry(_targetRegistry);
+        messageProcessor = IMessageProcessor(_messageProcessor); // Added
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(ROUTER_ROLE, msg.sender);
@@ -68,7 +83,14 @@ contract MessageRouter is IMessageRouter, AccessControl, Pausable, ReentrancyGua
         address target,
         uint16 targetChain,
         bytes calldata payload
-    ) external payable override whenNotPaused nonReentrant returns (RoutingResult memory) {
+    )
+        external
+        payable
+        override
+        whenNotPaused
+        nonReentrant
+        returns (RoutingResult memory)
+    {
         require(
             hasRole(ROUTER_ROLE, msg.sender),
             "MessageRouter: Must have router role"
@@ -80,10 +102,7 @@ contract MessageRouter is IMessageRouter, AccessControl, Pausable, ReentrancyGua
         require(payload.length > 0, "MessageRouter: Empty payload");
 
         uint256 deliveryCost = quoteRoutingFee(targetChain, payload.length);
-        require(
-            msg.value >= deliveryCost,
-            "MessageRouter: Insufficient fee"
-        );
+        require(msg.value >= deliveryCost, "MessageRouter: Insufficient fee");
 
         bytes32 deliveryHash;
         if (targetChain == block.chainid) {
@@ -91,7 +110,12 @@ contract MessageRouter is IMessageRouter, AccessControl, Pausable, ReentrancyGua
             deliveryHash = _routeLocal(messageId, target, payload);
         } else {
             // Cross-chain delivery via Wormhole
-            deliveryHash = _routeCrossChain(messageId, target, targetChain, payload);
+            deliveryHash = _routeCrossChain(
+                messageId,
+                target,
+                targetChain,
+                payload
+            );
         }
 
         deliveryHashes[messageId] = deliveryHash;
@@ -105,12 +129,13 @@ contract MessageRouter is IMessageRouter, AccessControl, Pausable, ReentrancyGua
             deliveryHash
         );
 
-        return RoutingResult({
-            messageId: messageId,
-            success: true,
-            deliveryHash: deliveryHash,
-            timestamp: block.timestamp
-        });
+        return
+            RoutingResult({
+                messageId: messageId,
+                success: true,
+                deliveryHash: deliveryHash,
+                timestamp: block.timestamp
+            });
     }
 
     /**
@@ -123,10 +148,11 @@ contract MessageRouter is IMessageRouter, AccessControl, Pausable, ReentrancyGua
         uint16 targetChain,
         uint256 payloadSize
     ) public view override returns (uint256) {
-        uint256 gasLimit = chainGasLimits[targetChain] == 0 ? 
-            GAS_LIMIT : chainGasLimits[targetChain];
+        uint256 gasLimit = chainGasLimits[targetChain] == 0
+            ? GAS_LIMIT
+            : chainGasLimits[targetChain];
 
-        (uint256 deliveryCost,) = wormholeRelayer.quoteEVMDeliveryPrice(
+        (uint256 deliveryCost, ) = wormholeRelayer.quoteEVMDeliveryPrice(
             targetChain,
             payloadSize,
             gasLimit
@@ -171,18 +197,22 @@ contract MessageRouter is IMessageRouter, AccessControl, Pausable, ReentrancyGua
         address target,
         bytes memory payload
     ) private returns (bytes32) {
-        bytes32 deliveryHash = keccak256(
-            abi.encodePacked(messageId, target, payload)
+        // Current implementation is insufficient:
+        (bool success, ) = target.call(payload);
+        require(success, "Local delivery failed");
+
+        // Should be:
+        IMessageHandler handler = IMessageHandler(target);
+        bytes memory result = handler.handleMessage(messageId, payload);
+
+        IMessageProcessor.ProcessingResult memory procResult = messageProcessor.processMessage(
+            messageId,
+            handler.getSupportedMessageTypes()[0],
+            result
         );
 
-        // Execute local delivery logic here
-        (bool success,) = target.call(payload);
-        require(success, "MessageRouter: Local delivery failed");
-
-        routingStatus[deliveryHash] = true;
-        emit MessageDelivered(messageId, deliveryHash, true);
-
-        return deliveryHash;
+        //emit LocalMessageProcessed(messageId, procResult.success);
+        return keccak256(abi.encode(messageId, block.timestamp));
     }
 
     /**
@@ -201,13 +231,15 @@ contract MessageRouter is IMessageRouter, AccessControl, Pausable, ReentrancyGua
             payload
         );
 
-        uint256 gasLimit = chainGasLimits[targetChain] == 0 ? GAS_LIMIT : chainGasLimits[targetChain];
-        
+        uint256 gasLimit = chainGasLimits[targetChain] == 0
+            ? GAS_LIMIT
+            : chainGasLimits[targetChain];
+
         // Send message via Wormhole
         uint64 sequence = wormhole.publishMessage{value: wormhole.messageFee()}(
             0, // nonce
             vaaPayload,
-            1  // consistency level
+            1 // consistency level
         );
 
         return keccak256(abi.encodePacked(sequence, targetChain));
@@ -269,11 +301,11 @@ contract MessageRouter is IMessageRouter, AccessControl, Pausable, ReentrancyGua
             hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
             "MessageRouter: Must have admin role"
         );
-        
+
         uint256 balance = address(this).balance;
         require(balance > 0, "MessageRouter: No fees to withdraw");
-        
-        (bool success,) = msg.sender.call{value: balance}("");
+
+        (bool success, ) = msg.sender.call{value: balance}("");
         require(success, "MessageRouter: Transfer failed");
     }
 

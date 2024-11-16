@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { ethers, deployments, getNamedAccounts } from "hardhat";
-import { MessageProcessor } from "../../typechain";
+import { MessageProcessor, MockHandler } from "../../typechain";
 
 describe("MessageProcessor", function () {
     let messageProcessor: MessageProcessor;
@@ -11,7 +11,7 @@ describe("MessageProcessor", function () {
     beforeEach(async function () {
         await deployments.fixture(['MessageProcessor']);
 
-        const { admin, processor, handlerAdmin } = await getNamedAccounts();
+        const { admin, processor, msgHandlerAdmin } = await getNamedAccounts();
 
         const MessageProcessorDeployment = await deployments.get('MessageProcessor');
         messageProcessor = await ethers.getContractAt('MessageProcessor', MessageProcessorDeployment.address);
@@ -21,7 +21,7 @@ describe("MessageProcessor", function () {
         const handlerAdminRole = await messageProcessor.HANDLER_ADMIN_ROLE();
 
         await messageProcessor.connect(await ethers.getSigner(admin)).grantRole(processorRole, processor);
-        await messageProcessor.connect(await ethers.getSigner(admin)).grantRole(handlerAdminRole, handlerAdmin);
+        await messageProcessor.connect(await ethers.getSigner(admin)).grantRole(handlerAdminRole, msgHandlerAdmin);
     });
 
     describe("Deployment", function () {
@@ -31,28 +31,28 @@ describe("MessageProcessor", function () {
         });
 
         it("Should set initial roles correctly", async function () {
-            const { processor, handlerAdmin } = await getNamedAccounts();
+            const { processor, msgHandlerAdmin } = await getNamedAccounts();
             expect(await messageProcessor.hasRole(await messageProcessor.PROCESSOR_ROLE(), processor)).to.be.true;
-            expect(await messageProcessor.hasRole(await messageProcessor.HANDLER_ADMIN_ROLE(), handlerAdmin)).to.be.true;
+            expect(await messageProcessor.hasRole(await messageProcessor.HANDLER_ADMIN_ROLE(), msgHandlerAdmin)).to.be.true;
         });
     });
 
     describe("Handler Management", function () {
         it("Should allow handler admin to register handler", async function () {
-            const { handlerAdmin } = await getNamedAccounts();
+            const { msgHandlerAdmin } = await getNamedAccounts();
             const mockHandler = ethers.Wallet.createRandom().address;
 
-            await expect(messageProcessor.connect(await ethers.getSigner(handlerAdmin))
+            await expect(messageProcessor.connect(await ethers.getSigner(msgHandlerAdmin))
                 .registerMessageHandler(testMessageType, mockHandler))
                 .to.emit(messageProcessor, "HandlerRegistered")
-                .withArgs(testMessageType, mockHandler);
+                .withArgs(testMessageType, mockHandler, msgHandlerAdmin);
         });
 
         it("Should store correct handler address", async function () {
-            const { handlerAdmin } = await getNamedAccounts();
+            const { msgHandlerAdmin } = await getNamedAccounts();
             const mockHandler = ethers.Wallet.createRandom().address;
 
-            await messageProcessor.connect(await ethers.getSigner(handlerAdmin))
+            await messageProcessor.connect(await ethers.getSigner(msgHandlerAdmin))
                 .registerMessageHandler(testMessageType, mockHandler);
 
             expect(await messageProcessor.getHandler(testMessageType)).to.equal(mockHandler);
@@ -72,28 +72,40 @@ describe("MessageProcessor", function () {
         let mockHandler: string;
 
         beforeEach(async function () {
-            const { handlerAdmin } = await getNamedAccounts();
-            
+            const { msgHandlerAdmin } = await getNamedAccounts();
+
             // Deploy and configure mock handler
             const MockHandler = await ethers.getContractFactory("MockHandler");
             const handler = await MockHandler.deploy();
             mockHandler = await handler.getAddress();
 
-            await messageProcessor.connect(await ethers.getSigner(handlerAdmin))
+            await messageProcessor.connect(await ethers.getSigner(msgHandlerAdmin))
                 .registerMessageHandler(testMessageType, mockHandler);
 
-            await messageProcessor.connect(await ethers.getSigner(handlerAdmin))
+            await messageProcessor.connect(await ethers.getSigner(msgHandlerAdmin))
                 .setRequiredAction(testMessageType, 0); // NOTIFICATION_ONLY
         });
 
         it("Should process message successfully", async function () {
             const { processor } = await getNamedAccounts();
-            
-            const result = await messageProcessor.connect(await ethers.getSigner(processor))
+            const processorSigner = await ethers.getSigner(processor);
+
+            // Process message and wait for transaction
+            const tx = await messageProcessor.connect(processorSigner)
                 .processMessage(testMessageId, testMessageType, testPayload);
 
+            // Wait for the transaction and events
+            await expect(tx)
+                .to.emit(messageProcessor, "ProcessingStarted")
+                .withArgs(testMessageId, testMessageType, 0) // 0 for NOTIFICATION_ONLY
+                .to.emit(messageProcessor, "ProcessingCompleted")
+                .withArgs(testMessageId, true, ethers.ZeroHash);  // true for success, zero hash for no settlement
+
+            // Get the processing result using view function
+            const result = await messageProcessor.getProcessingStatus(testMessageId);
             expect(result.success).to.be.true;
             expect(result.messageId).to.equal(testMessageId);
+            expect(result.action).to.equal(0); // NOTIFICATION_ONLY
         });
 
         it("Should emit correct events", async function () {
@@ -109,7 +121,7 @@ describe("MessageProcessor", function () {
 
         it("Should revert if message already processed", async function () {
             const { processor } = await getNamedAccounts();
-            
+
             await messageProcessor.connect(await ethers.getSigner(processor))
                 .processMessage(testMessageId, testMessageType, testPayload);
 
@@ -129,7 +141,7 @@ describe("MessageProcessor", function () {
         it("Should prevent operations when paused", async function () {
             const { admin, processor } = await getNamedAccounts();
             await messageProcessor.connect(await ethers.getSigner(admin)).pause();
-            
+
             await expect(messageProcessor.connect(await ethers.getSigner(processor))
                 .processMessage(testMessageId, testMessageType, testPayload))
                 .to.be.reverted;

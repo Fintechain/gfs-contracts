@@ -7,10 +7,10 @@ const func: DeployFunction = async function ({
     ...hre
 }: HardhatRuntimeEnvironment) {
     const { deploy } = deployments;
-    const { admin } = await getNamedAccounts();
+    const { liquidityPoolAdmin } = await getNamedAccounts();
 
-    await deploy("ProtocolGovernance", {
-        from: admin,
+    await deploy("LiquidityPool", {
+        from: liquidityPoolAdmin,
         args: [],
         log: true,
     });
@@ -18,7 +18,7 @@ const func: DeployFunction = async function ({
     return true;
 };
 
-func.id = "ProtocolGovernance";
-func.tags = ["core", "local", "ProtocolGovernance"];
+func.id = "LiquidityPool";
+func.tags = ["core", "local", "LiquidityPool"];
 
 export default func;

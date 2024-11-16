@@ -9,7 +9,7 @@ const func: DeployFunction = async function ({
     const { deploy } = deployments;
     const { admin } = await getNamedAccounts();
 
-    await deploy("ProtocolGovernance", {
+    await deploy("MessageProcessor", {
         from: admin,
         args: [],
         log: true,
@@ -18,7 +18,7 @@ const func: DeployFunction = async function ({
     return true;
 };
 
-func.id = "ProtocolGovernance";
-func.tags = ["core", "local", "ProtocolGovernance"];
+func.id = "MessageProcessor";
+func.tags = ["core", "local", "MessageProcessor"];
 
 export default func;

@@ -7,12 +7,10 @@ const func: DeployFunction = async function ({
     ...hre
 }: HardhatRuntimeEnvironment) {
     const { deploy } = deployments;
-    const { deployer, platformAdmin } = await getNamedAccounts();
-
-    const defaultAdmin = platformAdmin; // or any other address you want to set as default admin
+    const { admin } = await getNamedAccounts();
 
     await deploy("TargetRegistry", {
-        from: platformAdmin,
+        from: admin,
         args: [],
         log: true,
     });
@@ -21,6 +19,6 @@ const func: DeployFunction = async function ({
 };
 
 func.id = "TargetRegistry";
-func.tags = ["core", "TargetRegistry"];
+func.tags = ["core", "local", "TargetRegistry"];
 
 export default func;

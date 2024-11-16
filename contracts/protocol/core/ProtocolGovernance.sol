@@ -31,11 +31,6 @@ contract ProtocolGovernance is IProtocolGovernance, AccessControl, Pausable, Ree
     uint256 private proposalCount;
     uint256 private totalVotingPower;
 
-    // Events
-    event VoteCast(uint256 indexed proposalId, address indexed voter, bool support);
-    event EmergencyActionExecuted(bytes32 indexed actionHash);
-    event VotingPowerUpdated(address indexed account, uint256 newPower);
-
     /**
      * @notice Contract constructor
      * @dev Sets up initial roles and voting power

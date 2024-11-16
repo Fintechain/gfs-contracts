@@ -39,6 +39,13 @@ interface IMessageProcessor {
         bytes32 settlementId
     );
 
+    /// @notice Emitted when a new message handler is registered
+    event HandlerRegistered(
+        bytes32 indexed messageType,
+        address indexed handler,
+        address indexed registeredBy
+    );
+
     /**
      * @notice Process an ISO20022 message
      * @param messageId Unique message identifier

@@ -26,7 +26,8 @@ interface IMessageRegistry {
         DELIVERED,  // Message delivered to target
         PROCESSED,  // Message processed by target
         FAILED,     // Message processing failed
-        SETTLED     // Message resulted in settlement
+        SETTLED ,   // Message resulted in settlement
+        CANCELLED
     }
 
     /// @notice Emitted when a new message is registered
