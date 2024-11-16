@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import "../interfaces/IMessageHandler.sol";
 
-contract MockHandler is IMessageHandler {
+contract MockMessageHandler is IMessageHandler {
     bool public shouldSucceed = true;
     bytes32[] public supportedTypes;
     mapping(bytes32 => bytes) public results;

@@ -35,7 +35,13 @@ const config: HardhatUserConfig = {
         executor: {
             default: 2,
         },
+        emergencyAdmin: {
+            default: 2,
+        },
         settler: {
+            default: 3,
+        },
+        operator: {
             default: 3,
         },
         validator: {
