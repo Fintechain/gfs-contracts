@@ -11,10 +11,6 @@ import "../../interfaces/ITargetRegistry.sol";
 import "../../interfaces/IMessageHandler.sol";
 import "../../interfaces/IMessageProcessor.sol";
 
-/**
- * @title MessageRouter
- * @notice Routes ISO20022 messages between chains using Wormhole protocol
- */
 contract MessageRouter is
     IMessageRouter,
     AccessControl,
@@ -27,33 +23,24 @@ contract MessageRouter is
 
     // Constants
     uint256 private constant GAS_LIMIT = 250_000;
+    uint256 private constant BASE_LOCAL_FEE = 0.001 ether;
+    uint256 private constant PAYLOAD_FEE_MULTIPLIER = 100 wei;
+
+    // Cross-chain fee parameters (adjustable)
+    uint256 private baseCrossChainFee = 0.002 ether;
+    uint256 private crossChainFeeMultiplier = 200 wei;
 
     // Dependencies
     ITargetRegistry public immutable targetRegistry;
     IWormhole public immutable wormhole;
     IWormholeRelayer public immutable wormholeRelayer;
-
-    IMessageProcessor public immutable messageProcessor; // Added
+    IMessageProcessor public immutable messageProcessor;
 
     // Storage
     mapping(bytes32 => bytes32) private deliveryHashes;
     mapping(bytes32 => bool) private routingStatus;
     mapping(uint16 => uint256) private chainGasLimits;
 
-    // Events not in interface
-    event ChainGasLimitUpdated(uint16 indexed chainId, uint256 gasLimit);
-    event DeliveryCompleted(
-        bytes32 indexed messageId,
-        bytes32 indexed deliveryHash
-    );
-
-    /**
-     * @notice Contract constructor
-     * @param _wormholeRelayer Wormhole relayer address
-     * @param _wormhole Wormhole core contract address
-     * @param _targetRegistry Target registry contract address
-     * @param _messageProcessor Message processpr contract address
-     */
     constructor(
         address _wormholeRelayer,
         address _wormhole,
@@ -63,11 +50,65 @@ contract MessageRouter is
         wormholeRelayer = IWormholeRelayer(_wormholeRelayer);
         wormhole = IWormhole(_wormhole);
         targetRegistry = ITargetRegistry(_targetRegistry);
-        messageProcessor = IMessageProcessor(_messageProcessor); // Added
+        messageProcessor = IMessageProcessor(_messageProcessor);
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(ROUTER_ROLE, msg.sender);
         _grantRole(RELAYER_ROLE, msg.sender);
+    }
+
+    function calculateLocalRoutingFee(
+        uint256 payloadSize
+    ) public pure override returns (uint256) {
+        return BASE_LOCAL_FEE + (payloadSize * PAYLOAD_FEE_MULTIPLIER);
+    }
+
+    function calculateCrossChainProcessingFee(
+        uint256 payloadSize
+    ) public view override returns (uint256) {
+        return baseCrossChainFee + (payloadSize * crossChainFeeMultiplier);
+    }
+
+    function quoteRoutingFee(
+        uint16 targetChain,
+        uint256 payloadSize
+    ) public view override returns (uint256) {
+        // For local delivery, only charge local processing fee
+        if (targetChain == block.chainid) {
+            return calculateLocalRoutingFee(payloadSize);
+        }
+
+        // For cross-chain delivery, include our processing fee plus Wormhole fees
+        uint256 processingFee = calculateCrossChainProcessingFee(payloadSize);
+        
+        uint256 gasLimit = chainGasLimits[targetChain] == 0
+            ? GAS_LIMIT
+            : chainGasLimits[targetChain];
+
+        (uint256 deliveryCost, ) = wormholeRelayer.quoteEVMDeliveryPrice(
+            targetChain,
+            payloadSize,
+            gasLimit
+        );
+
+        return processingFee + deliveryCost + wormhole.messageFee();
+    }
+
+    
+
+    function setCrossChainFeeParameters(
+        uint256 baseFee,
+        uint256 feeMultiplier
+    ) external override {
+        require(
+            hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
+            "MessageRouter: Must have admin role"
+        );
+        
+        baseCrossChainFee = baseFee;
+        crossChainFeeMultiplier = feeMultiplier;
+        
+        emit CrossChainFeesUpdated(baseFee, feeMultiplier);
     }
 
     /**
@@ -108,6 +149,13 @@ contract MessageRouter is
         if (targetChain == block.chainid) {
             // Local delivery
             deliveryHash = _routeLocal(messageId, target, payload);
+
+            // Refund excess payment for local delivery
+            uint256 excess = msg.value - deliveryCost;
+            if (excess > 0) {
+                (bool success, ) = msg.sender.call{value: excess}("");
+                require(success, "MessageRouter: Refund failed");
+            }
         } else {
             // Cross-chain delivery via Wormhole
             deliveryHash = _routeCrossChain(
@@ -119,7 +167,6 @@ contract MessageRouter is
         }
 
         deliveryHashes[messageId] = deliveryHash;
-        routingStatus[deliveryHash] = false;
 
         emit MessageRouted(
             messageId,
@@ -139,26 +186,79 @@ contract MessageRouter is
     }
 
     /**
-     * @notice Calculate routing fee for a message
-     * @param targetChain Target chain ID
-     * @param payloadSize Size of the message payload
-     * @return fee Required fee for routing
+     * @notice Route message locally
+     * @param messageId Message identifier
+     * @param target Target address
+     * @param payload Message payload
+     * @return deliveryHash Hash of the delivery
      */
-    function quoteRoutingFee(
+    function _routeLocal(
+        bytes32 messageId,
+        address target,
+        bytes memory payload
+    ) private returns (bytes32) {
+        // Process the message using handler
+        IMessageHandler handler = IMessageHandler(target);
+        bytes memory result = handler.handleMessage(messageId, payload);
+
+        // Process the result
+        IMessageProcessor.ProcessingResult memory procResult = messageProcessor
+            .processMessage(
+                messageId,
+                handler.getSupportedMessageTypes()[0],
+                result
+            );
+
+        // Mark delivery as completed immediately for local routing
+        bytes32 deliveryHash = keccak256(
+            abi.encode(messageId, block.timestamp)
+        );
+        routingStatus[deliveryHash] = true;
+
+        emit DeliveryCompleted(messageId, deliveryHash);
+        emit MessageDelivered(messageId, deliveryHash, true);
+
+        return deliveryHash;
+    }
+
+    /**
+     * @notice Route message cross-chain via Wormhole
+     */
+    function _routeCrossChain(
+        bytes32 messageId,
+        address target,
         uint16 targetChain,
-        uint256 payloadSize
-    ) public view override returns (uint256) {
+        bytes memory payload
+    ) private returns (bytes32) {
+        // Calculate our processing fee to keep
+        uint256 processingFee = calculateCrossChainProcessingFee(payload.length);
+        
+        // Calculate Wormhole fees
         uint256 gasLimit = chainGasLimits[targetChain] == 0
             ? GAS_LIMIT
             : chainGasLimits[targetChain];
-
+            
         (uint256 deliveryCost, ) = wormholeRelayer.quoteEVMDeliveryPrice(
             targetChain,
-            payloadSize,
+            payload.length,
             gasLimit
         );
 
-        return deliveryCost + wormhole.messageFee();
+        bytes memory vaaPayload = abi.encode(
+            messageId,
+            msg.sender,
+            target,
+            payload
+        );
+
+        // Send message via Wormhole
+        uint64 sequence = wormhole.publishMessage{value: wormhole.messageFee()}(
+            0, // nonce
+            vaaPayload,
+            1 // consistency level
+        );
+
+        return keccak256(abi.encodePacked(sequence, targetChain));
     }
 
     /**
@@ -186,66 +286,6 @@ contract MessageRouter is
     }
 
     /**
-     * @notice Route message locally
-     * @param messageId Message identifier
-     * @param target Target address
-     * @param payload Message payload
-     * @return deliveryHash Hash of the delivery
-     */
-    function _routeLocal(
-        bytes32 messageId,
-        address target,
-        bytes memory payload
-    ) private returns (bytes32) {
-        // Current implementation is insufficient:
-        (bool success, ) = target.call(payload);
-        require(success, "Local delivery failed");
-
-        // Should be:
-        IMessageHandler handler = IMessageHandler(target);
-        bytes memory result = handler.handleMessage(messageId, payload);
-
-        IMessageProcessor.ProcessingResult memory procResult = messageProcessor.processMessage(
-            messageId,
-            handler.getSupportedMessageTypes()[0],
-            result
-        );
-
-        //emit LocalMessageProcessed(messageId, procResult.success);
-        return keccak256(abi.encode(messageId, block.timestamp));
-    }
-
-    /**
-     * @notice Route message cross-chain via Wormhole
-     */
-    function _routeCrossChain(
-        bytes32 messageId,
-        address target,
-        uint16 targetChain,
-        bytes memory payload
-    ) private returns (bytes32) {
-        bytes memory vaaPayload = abi.encode(
-            messageId,
-            msg.sender,
-            target,
-            payload
-        );
-
-        uint256 gasLimit = chainGasLimits[targetChain] == 0
-            ? GAS_LIMIT
-            : chainGasLimits[targetChain];
-
-        // Send message via Wormhole
-        uint64 sequence = wormhole.publishMessage{value: wormhole.messageFee()}(
-            0, // nonce
-            vaaPayload,
-            1 // consistency level
-        );
-
-        return keccak256(abi.encodePacked(sequence, targetChain));
-    }
-
-    /**
      * @notice Set gas limit for a specific chain
      */
     function setChainGasLimit(uint16 chainId, uint256 gasLimit) external {
@@ -261,14 +301,20 @@ contract MessageRouter is
 
     /**
      * @notice Mark a delivery as completed
+     * @param deliveryHash Hash identifying the delivery
      */
     function markDeliveryCompleted(bytes32 deliveryHash) external {
         require(
             hasRole(RELAYER_ROLE, msg.sender),
             "MessageRouter: Must have relayer role"
         );
+
         routingStatus[deliveryHash] = true;
+
+        // Using bytes32(0) since we don't have the messageId in this context
+        // If messageId is needed, we would need to store it in a mapping when routing
         emit DeliveryCompleted(bytes32(0), deliveryHash);
+        emit MessageDelivered(bytes32(0), deliveryHash, true);
     }
 
     /**

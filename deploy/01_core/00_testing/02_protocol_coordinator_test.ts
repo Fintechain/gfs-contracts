@@ -14,7 +14,6 @@ const func: DeployFunction = async function ({
     const messageProtocol = (await get("MockMessageProtocol")).address;
     const messageRouter = (await get("MockMessageRouter")).address;
     const messageProcessor = (await get("MockMessageProcessor")).address;
-    const settlementController = (await get("MockSettlementController")).address;
 
     // Deploy test version of ProtocolCoordinator with mocks
     const deployment = await deploy("ProtocolCoordinator", {
@@ -24,7 +23,6 @@ const func: DeployFunction = async function ({
             messageProtocol,
             messageRouter,
             messageProcessor,
-            settlementController
         ],
         log: true,
         waitConfirmations: 1

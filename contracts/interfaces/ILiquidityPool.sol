@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 /**
  * @title ILiquidityPool
- * @notice Interface for managing liquidity pools used in cross-chain settlements
+ * @notice Interface for managing liquidity pools used in settlements
  */
 interface ILiquidityPool {
     /// @notice Pool status information
@@ -14,15 +14,6 @@ interface ILiquidityPool {
         uint256 minLiquidity;
         uint256 maxLiquidity;
         bool isActive;
-    }
-
-    /// @notice Token pair for cross-chain settlement
-    struct TokenPair {
-        address sourceToken;
-        address targetToken;
-        uint16 sourceChain;
-        uint16 targetChain;
-        bool isSupported;
     }
 
     /// @notice Emitted when liquidity is added
@@ -37,6 +28,41 @@ interface ILiquidityPool {
         address indexed token,
         address indexed provider,
         uint256 amount
+    );
+
+    /// @notice Emitted when a new pool is created
+    event PoolCreated(
+        address indexed token, 
+        uint256 minLiquidity, 
+        uint256 maxLiquidity
+    );
+
+    /// @notice Emitted when pool parameters are updated
+    event PoolUpdated(
+        address indexed token, 
+        uint256 minLiquidity, 
+        uint256 maxLiquidity
+    );
+
+    /// @notice Emitted when liquidity is locked for settlement
+    event LiquidityLocked(
+        address indexed token, 
+        bytes32 indexed settlementId, 
+        uint256 amount
+    );
+
+    /// @notice Emitted when locked liquidity is released
+    event LiquidityReleased(
+        address indexed token, 
+        bytes32 indexed settlementId, 
+        uint256 amount
+    );
+
+    /// @notice Emitted when a settlement is completed
+    event SettlementCompleted(
+        bytes32 indexed settlementId,
+        uint256 amount,
+        address recipient
     );
 
     /**
@@ -74,15 +100,17 @@ interface ILiquidityPool {
     ) external;
 
     /**
-     * @notice Release locked liquidity
+     * @notice Initiate a settlement and execute the token transfer
+     * @param settlementId Unique identifier for the settlement
      * @param token Token address
-     * @param amount Amount to release
-     * @param settlementId Associated settlement ID
+     * @param amount Amount to be settled
+     * @param recipient Recipient address for the settlement
      */
-    function releaseLiquidity(
+    function initiateSettlement(
+        bytes32 settlementId,
         address token,
         uint256 amount,
-        bytes32 settlementId
+        address recipient
     ) external;
 
     /**
@@ -104,10 +132,4 @@ interface ILiquidityPool {
     function getPoolInfo(
         address token
     ) external view returns (PoolInfo memory);
-
-    /**
-     * @notice Get supported token pairs
-     * @return pairs Array of supported token pairs
-     */
-    function getSupportedPairs() external view returns (TokenPair[] memory);
 }

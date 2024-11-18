@@ -12,7 +12,7 @@ const func: DeployFunction = async function ({
 
     // Get dependency addresses
     // Note: These contracts should be deployed before SettlementController
-    const liquidityPool = (await get("LiquidityPool")).address;
+    const liquidityPool = (await get("MockLiquidityPool")).address;
 
     const deployment = await deploy("SettlementController", {
         from: admin,
@@ -44,11 +44,15 @@ const func: DeployFunction = async function ({
 };
 
 // Dependencies
-func.dependencies = [
-    "LiquidityPool"
-];
+func.dependencies = ["mocks"];
 
-func.id = "SettlementController";
-func.tags = ["core", "SettlementController"];
+func.id = "SettlementController_Test";
+func.tags = ["SettlementController_Test"];
+
+// Skip this deployment in production
+func.skip = async (hre) => {
+    // Skip if not in test environment
+    return hre.network.name !== "hardhat" && hre.network.name !== "localhost";
+};
 
 export default func;

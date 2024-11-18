@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { ethers, deployments, getNamedAccounts } from "hardhat";
-import { MessageProcessor, MockHandler } from "../../typechain";
+import { MessageProcessor, MockMessageHandler } from "../../typechain";
 
 describe("MessageProcessor", function () {
     let messageProcessor: MessageProcessor;
@@ -75,8 +75,8 @@ describe("MessageProcessor", function () {
             const { msgHandlerAdmin } = await getNamedAccounts();
 
             // Deploy and configure mock handler
-            const MockHandler = await ethers.getContractFactory("MockHandler");
-            const handler = await MockHandler.deploy();
+            const MockMessageHandler = await ethers.getContractFactory("MockMessageHandler");
+            const handler = await MockMessageHandler.deploy();
             mockHandler = await handler.getAddress();
 
             await messageProcessor.connect(await ethers.getSigner(msgHandlerAdmin))

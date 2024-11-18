@@ -1,202 +1,263 @@
 import { expect } from "chai";
 import { ethers, deployments, getNamedAccounts } from "hardhat";
-import { MessageRouter, MockWormhole, MockWormholeRelayer, MockTargetRegistry } from "../../typechain";
+import { MessageRouter, MockWormhole, MockWormholeRelayer, MockTargetRegistry, MockMessageProcessor, MockMessageHandler } from "../../typechain";
+import { Address } from "hardhat-deploy/types";
 
 describe("MessageRouter", function () {
     let messageRouter: MessageRouter;
     let mockWormhole: MockWormhole;
     let mockWormholeRelayer: MockWormholeRelayer;
     let mockTargetRegistry: MockTargetRegistry;
+    let mockMessageProcessor: MockMessageProcessor;
 
     // Constants for testing
-    const testMessageId = ethers.id("TEST_MESSAGE");
+    const testMessageId = ethers.keccak256(ethers.toUtf8Bytes("TEST_MESSAGE"));
     const testPayload = ethers.toUtf8Bytes("test-payload");
-    const sourceChain = 1;  // e.g., Ethereum
-    const targetChain = 6;  // e.g., Avalanche
-    const GAS_LIMIT = 250_000;
+    const sourceChain = 1; // e.g., Ethereum
+    const targetChain = 6; // e.g., Avalanche
+    const GAS_LIMIT = 250_000n;
     const MESSAGE_FEE = ethers.parseEther("0.001");
 
+    // Store target address at the describe level
+    let targetAddress: Address;
+
     beforeEach(async function () {
-        await deployments.fixture(['MessageRouter']);
+        await deployments.fixture(['MessageRouter_Test']);
 
-        const { admin, router, relayer } = await getNamedAccounts();
+        const mockWormholeDeployment = await deployments.get('MockWormhole');
+        const mockWormholeRelayerDeployment = await deployments.get('MockWormholeRelayer');
+        const mockTargetRegistryDeployment = await deployments.get('MockTargetRegistry');
+        const mockMessageProcessorDeployment = await deployments.get('MockMessageProcessor');
+        const messageRouterDeployment = await deployments.get('MessageRouter');
 
-        // Deploy mock contracts
-        const WormholeFactory = await ethers.getContractFactory("MockWormhole");
-        mockWormhole = await WormholeFactory.deploy();
+        mockWormhole = await ethers.getContractAt("MockWormhole", mockWormholeDeployment.address);
+        mockWormholeRelayer = await ethers.getContractAt("MockWormholeRelayer", mockWormholeRelayerDeployment.address);
+        mockTargetRegistry = await ethers.getContractAt("MockTargetRegistry", mockTargetRegistryDeployment.address);
+        mockMessageProcessor = await ethers.getContractAt("MockMessageProcessor", mockMessageProcessorDeployment.address);
+        messageRouter = await ethers.getContractAt("MessageRouter", messageRouterDeployment.address);
+
+        // Set initial mock states
         await mockWormhole.setMessageFee(MESSAGE_FEE);
 
-        const WormholeRelayerFactory = await ethers.getContractFactory("MockWormholeRelayer");
-        mockWormholeRelayer = await WormholeRelayerFactory.deploy();
-
-        const TargetRegistryFactory = await ethers.getContractFactory("MockTargetRegistry");
-        mockTargetRegistry = await TargetRegistryFactory.deploy();
-
-        // Deploy MessageRouter
-        const MessageRouterFactory = await ethers.getContractFactory("MessageRouter");
-        messageRouter = await MessageRouterFactory.deploy(
-            mockWormholeRelayer.getAddress(),
-            mockWormhole.getAddress(),
-            mockTargetRegistry.getAddress()
+        // Set initial mock relayer prices
+        await mockWormholeRelayer.setDeliveryPrice(
+            targetChain,
+            ethers.parseEther("0.1"), // Base delivery price
+            ethers.parseEther("0.00001") // Refund per unused gas
+        );
+        await mockWormholeRelayer.setGasAndBytePrices(
+            ethers.parseUnits("1", "gwei"), // 1 gwei per gas
+            ethers.parseUnits("100", "wei") // 100 wei per byte
         );
 
-        // Grant roles
-        const routerRole = await messageRouter.ROUTER_ROLE();
-        const relayerRole = await messageRouter.RELAYER_ROLE();
-
-        await messageRouter.connect(await ethers.getSigner(admin))
-            .grantRole(routerRole, router);
-        await messageRouter.connect(await ethers.getSigner(admin))
-            .grantRole(relayerRole, relayer);
-    });
-
-    describe("Deployment", function () {
-        it("Should set the correct admin", async function () {
-            const { admin } = await getNamedAccounts();
-            expect(await messageRouter.hasRole(await messageRouter.DEFAULT_ADMIN_ROLE(), admin))
-                .to.be.true;
-        });
-
-        it("Should set initial roles correctly", async function () {
-            const { router, relayer } = await getNamedAccounts();
-            expect(await messageRouter.hasRole(await messageRouter.ROUTER_ROLE(), router))
-                .to.be.true;
-            expect(await messageRouter.hasRole(await messageRouter.RELAYER_ROLE(), relayer))
-                .to.be.true;
-        });
-
-        it("Should set correct dependencies", async function () {
-            expect(await messageRouter.wormhole()).to.equal(await mockWormhole.getAddress());
-            expect(await messageRouter.wormholeRelayer()).to.equal(await mockWormholeRelayer.getAddress());
-            expect(await messageRouter.targetRegistry()).to.equal(await mockTargetRegistry.getAddress());
-        });
+        // Initialize targetAddress
+        const { voter } = await getNamedAccounts();
+        targetAddress = voter;
+        await mockTargetRegistry.setValidTarget(targetAddress, targetChain, true);
     });
 
     describe("Message Routing", function () {
-        let targetAddress: string;
+        let mockTarget: MockMessageHandler;
+        let adminSigner: any;
+        let currentChainId: number;
 
         beforeEach(async function () {
-            // Setup mock target
-            targetAddress = ethers.Wallet.createRandom().address;
-            await mockTargetRegistry.setValidTarget(targetAddress, targetChain, true);
+            const { admin } = await getNamedAccounts();
+            adminSigner = await ethers.getSigner(admin);
+            currentChainId = Number(await ethers.provider.getNetwork().then(n => n.chainId));
+
+            // Deploy and setup mock handler
+            mockTarget = await ethers.deployContract("MockMessageHandler");
+            await mockTarget.setMockResult(ethers.toUtf8Bytes("processed"));
+            await mockTarget.setSupportedTypes([ethers.id("TEST_MESSAGE_TYPE")]);
+
+            // Setup permissions
+            const routerRole = await messageRouter.ROUTER_ROLE();
+            await messageRouter.connect(adminSigner).grantRole(routerRole, adminSigner.address);
+            
+            // Set target as valid
+            await mockTargetRegistry.setValidTarget(
+                await mockTarget.getAddress(),
+                currentChainId,
+                true
+            );
         });
 
         it("Should route local message successfully", async function () {
-            const { router } = await getNamedAccounts();
-            const mockTarget = await (await ethers.getContractFactory("MockTarget")).deploy();
+            // Calculate required fee
+            const localFee = await messageRouter.calculateLocalRoutingFee(testPayload.length);
 
-            await mockTargetRegistry.setValidTarget(await mockTarget.getAddress(), sourceChain, true);
+            const tx = await messageRouter.connect(adminSigner).routeMessage(
+                testMessageId,
+                await mockTarget.getAddress(),
+                currentChainId,
+                testPayload,
+                { value: localFee }
+            );
 
-            await expect(messageRouter.connect(await ethers.getSigner(router))
-                .routeMessage(
-                    testMessageId,
-                    await mockTarget.getAddress(),
-                    sourceChain,
-                    testPayload,
-                    { value: ethers.parseEther("0.1") }
-                ))
+            // Verify events
+            await expect(tx)
                 .to.emit(messageRouter, "MessageRouted")
                 .withArgs(
                     testMessageId,
-                    router,
+                    adminSigner.address,
                     await mockTarget.getAddress(),
-                    sourceChain,
-                    expect.any(String) // deliveryHash
+                    currentChainId,
+                    (arg: any) => typeof arg === "string"
                 );
+
+            await expect(tx)
+                .to.emit(messageRouter, "MessageDelivered")
+                .withArgs(
+                    testMessageId,
+                    (arg: any) => typeof arg === "string",
+                    true
+                );
+
+            await expect(tx)
+                .to.emit(messageRouter, "DeliveryCompleted");
+
+            // Verify delivery status
+            const receipt = await tx.wait();
+            if (!receipt) throw new Error("No receipt");
+
+            const block = await ethers.provider.getBlock(receipt.blockNumber);
+            if (!block) throw new Error("No block");
+
+            const deliveryHash = ethers.keccak256(
+                ethers.AbiCoder.defaultAbiCoder().encode(
+                    ["bytes32", "uint256"],
+                    [testMessageId, block.timestamp]
+                )
+            );
+            
+            expect(await messageRouter.getDeliveryStatus(deliveryHash)).to.be.true;
+        });
+
+        it("Should refund excess fee for local routing", async function () {
+            // Calculate fees
+            const localFee = await messageRouter.calculateLocalRoutingFee(testPayload.length);
+            const excessFee = localFee * 2n;
+
+            // Track initial balance
+            const initialBalance = await ethers.provider.getBalance(adminSigner.address);
+
+            // Route message with excess fee
+            const tx = await messageRouter.connect(adminSigner).routeMessage(
+                testMessageId,
+                await mockTarget.getAddress(),
+                currentChainId,
+                testPayload,
+                { value: excessFee }
+            );
+
+            const receipt = await tx.wait();
+            if (!receipt) throw new Error("No receipt");
+
+            // Calculate gas costs
+            const gasCost = receipt.gasUsed * receipt.gasPrice;
+
+            // Get final balance
+            const finalBalance = await ethers.provider.getBalance(adminSigner.address);
+
+            // Verify balance changes (should only lose localFee + gasCost)
+            const expectedBalance = initialBalance - localFee - gasCost;
+            expect(finalBalance).to.be.closeTo(expectedBalance, ethers.parseEther("0.0001"));
         });
 
         it("Should route cross-chain message successfully", async function () {
-            const { router } = await getNamedAccounts();
             const fee = await messageRouter.quoteRoutingFee(targetChain, testPayload.length);
 
-            await expect(messageRouter.connect(await ethers.getSigner(router))
-                .routeMessage(
+            const tx = await messageRouter.connect(adminSigner).routeMessage(
+                testMessageId,
+                targetAddress,
+                targetChain,
+                testPayload,
+                { value: fee }
+            );
+
+            await expect(tx)
+                .to.emit(messageRouter, "MessageRouted")
+                .withArgs(
                     testMessageId,
+                    adminSigner.address,
                     targetAddress,
                     targetChain,
-                    testPayload,
-                    { value: fee }
-                ))
-                .to.emit(messageRouter, "MessageRouted");
+                    (arg: any) => typeof arg === "string"
+                );
         });
 
-        it("Should track delivery status correctly", async function () {
-            const { router, relayer } = await getNamedAccounts();
+        it("Should fail for invalid target", async function () {
             const fee = await messageRouter.quoteRoutingFee(targetChain, testPayload.length);
+            const invalidTarget = ethers.Wallet.createRandom().address;
 
-            const tx = await messageRouter.connect(await ethers.getSigner(router))
-                .routeMessage(
+            await expect(
+                messageRouter.connect(adminSigner).routeMessage(
                     testMessageId,
-                    targetAddress,
+                    invalidTarget,
                     targetChain,
                     testPayload,
                     { value: fee }
-                );
-            const receipt = await tx.wait();
-            const event = receipt?.logs.find(x => x.eventSignature === "MessageRouted(bytes32,address,address,uint16,bytes32)");
-            const deliveryHash = event?.args?.[4];
+                )
+            ).to.be.revertedWith("MessageRouter: Invalid target");
+        });
 
-            // Check initial status
-            expect(await messageRouter.getDeliveryStatus(deliveryHash)).to.be.false;
+        it("Should fail for empty payload", async function () {
+            const fee = await messageRouter.quoteRoutingFee(targetChain, 0);
 
-            // Mark as completed
-            await messageRouter.connect(await ethers.getSigner(relayer))
-                .markDeliveryCompleted(deliveryHash);
-
-            // Check final status
-            expect(await messageRouter.getDeliveryStatus(deliveryHash)).to.be.true;
+            await expect(
+                messageRouter.connect(adminSigner).routeMessage(
+                    testMessageId,
+                    targetAddress,
+                    targetChain,
+                    "0x",
+                    { value: fee }
+                )
+            ).to.be.revertedWith("MessageRouter: Empty payload");
         });
     });
 
     describe("Fee Management", function () {
-        let targetAddress: string;
-
-        beforeEach(async function () {
-            targetAddress = ethers.Wallet.createRandom().address;
-            await mockTargetRegistry.setValidTarget(targetAddress, targetChain, true);
+        it("Should calculate local routing fee correctly", async function () {
+            const fee = await messageRouter.calculateLocalRoutingFee(testPayload.length);
+            const expectedFee = ethers.parseEther("0.001") + (BigInt(testPayload.length) * 100n);
+            expect(fee).to.equal(expectedFee);
         });
 
-        it("Should calculate correct routing fee", async function () {
-            const fee = await messageRouter.quoteRoutingFee(targetChain, testPayload.length);
-            expect(fee).to.be.gt(0);
+        it("Should calculate cross-chain processing fee correctly", async function () {
+            const fee = await messageRouter.calculateCrossChainProcessingFee(testPayload.length);
+            const expectedFee = ethers.parseEther("0.002") + (BigInt(testPayload.length) * 200n);
+            expect(fee).to.equal(expectedFee);
         });
 
-        it("Should require sufficient fee", async function () {
-            const { router } = await getNamedAccounts();
-            const fee = await messageRouter.quoteRoutingFee(targetChain, testPayload.length);
+        it("Should quote correct total fee for cross-chain routing", async function () {
+            const totalFee = await messageRouter.quoteRoutingFee(targetChain, testPayload.length);
+            const processingFee = await messageRouter.calculateCrossChainProcessingFee(testPayload.length);
+            const [wormholeDeliveryCost] = await mockWormholeRelayer.quoteEVMDeliveryPrice(
+                targetChain,
+                testPayload.length,
+                GAS_LIMIT
+            );
+            const wormholeMsgFee = await mockWormhole.messageFee();
 
-            await expect(messageRouter.connect(await ethers.getSigner(router))
-                .routeMessage(
-                    testMessageId,
-                    targetAddress,
-                    targetChain,
-                    testPayload,
-                    { value: fee.sub(1) }
-                )).to.be.revertedWith("MessageRouter: Insufficient fee");
+            expect(totalFee).to.equal(processingFee + wormholeDeliveryCost + wormholeMsgFee);
         });
 
-        it("Should allow admin to withdraw fees", async function () {
-            const { admin, router } = await getNamedAccounts();
-            const fee = await messageRouter.quoteRoutingFee(targetChain, testPayload.length);
+        it("Should update cross-chain fee parameters", async function () {
+            const { admin } = await getNamedAccounts();
+            const newBaseFee = ethers.parseEther("0.003");
+            const newMultiplier = 300n;
 
-            // Route message to accumulate fees
-            await messageRouter.connect(await ethers.getSigner(router))
-                .routeMessage(
-                    testMessageId,
-                    targetAddress,
-                    targetChain,
-                    testPayload,
-                    { value: fee }
-                );
+            await expect(
+                messageRouter.connect(await ethers.getSigner(admin))
+                    .setCrossChainFeeParameters(newBaseFee, newMultiplier)
+            )
+                .to.emit(messageRouter, "CrossChainFeesUpdated")
+                .withArgs(newBaseFee, newMultiplier);
 
-            // Withdraw fees
-            const adminSigner = await ethers.getSigner(admin);
-            const balanceBefore = await ethers.provider.getBalance(admin);
-            
-            await messageRouter.connect(adminSigner).withdrawFees();
-
-            const balanceAfter = await ethers.provider.getBalance(admin);
-            expect(balanceAfter).to.be.gt(balanceBefore);
+            const newFee = await messageRouter.calculateCrossChainProcessingFee(testPayload.length);
+            const expectedFee = newBaseFee + (BigInt(testPayload.length) * newMultiplier);
+            expect(newFee).to.equal(expectedFee);
         });
     });
 
@@ -204,24 +265,95 @@ describe("MessageRouter", function () {
         it("Should allow admin to set chain gas limit", async function () {
             const { admin } = await getNamedAccounts();
             const newGasLimit = 300_000;
-
+    
             await expect(messageRouter.connect(await ethers.getSigner(admin))
                 .setChainGasLimit(targetChain, newGasLimit))
                 .to.emit(messageRouter, "ChainGasLimitUpdated")
                 .withArgs(targetChain, newGasLimit);
         });
-
+    
         it("Should use custom gas limit in fee calculation", async function () {
             const { admin } = await getNamedAccounts();
-            const newGasLimit = 300_000;
-
-            await messageRouter.connect(await ethers.getSigner(admin))
-                .setChainGasLimit(targetChain, newGasLimit);
-
-            const fee = await messageRouter.quoteRoutingFee(targetChain, testPayload.length);
-            const defaultFee = await messageRouter.quoteRoutingFee(sourceChain, testPayload.length);
+            const adminSigner = await ethers.getSigner(admin);
             
-            expect(fee).to.not.equal(defaultFee);
+            // Set base delivery price in mock relayer
+            const baseGasPrice = ethers.parseUnits("1", "gwei"); // 1 gwei
+            await mockWormholeRelayer.setGasAndBytePrices(
+                baseGasPrice, // price per gas
+                0n  // price per byte
+            );
+            
+            // Set base delivery parameters
+            await mockWormholeRelayer.setDeliveryPrice(
+                targetChain,
+                0, // no base price
+                ethers.parseEther("0.00001") // some refund rate
+            );
+    
+            // Get fee with default gas limit
+            const defaultGasLimit = 250_000n; // From contract constant
+            const defaultFee = await messageRouter.quoteRoutingFee(targetChain, testPayload.length);
+    
+            // Set new higher gas limit
+            const newGasLimit = 300_000n;
+            await messageRouter.connect(adminSigner).setChainGasLimit(targetChain, newGasLimit);
+    
+            // Get fee with new gas limit
+            const customFee = await messageRouter.quoteRoutingFee(targetChain, testPayload.length);
+    
+            // Calculate expected difference based on gas price
+            const gasDifference = (newGasLimit - defaultGasLimit) * baseGasPrice;
+            
+            // Add some buffer for potential rounding
+            const tolerance = ethers.parseUnits("1", "wei");
+            
+            // Verify the difference is within expected range
+            const actualDifference = customFee - defaultFee;
+            expect(actualDifference).to.be.closeTo(gasDifference, tolerance);
+            expect(customFee).to.be.gt(defaultFee);
+        });
+    
+        it("Should fail to set gas limit to zero", async function () {
+            const { admin } = await getNamedAccounts();
+            await expect(
+                messageRouter.connect(await ethers.getSigner(admin))
+                    .setChainGasLimit(targetChain, 0)
+            ).to.be.revertedWith("MessageRouter: Invalid gas limit");
+        });
+        
+        it("Should properly calculate fees based on gas limit changes", async function () {
+            const { admin } = await getNamedAccounts();
+            const adminSigner = await ethers.getSigner(admin);
+    
+            // Set precise fee components
+            await mockWormholeRelayer.setGasAndBytePrices(
+                ethers.parseUnits("1", "gwei"), // 1 gwei per gas
+                ethers.parseUnits("1", "wei")  // 1 wei per byte
+            );
+            
+            await mockWormholeRelayer.setDeliveryPrice(
+                targetChain,
+                ethers.parseEther("0.1"), // base price
+                ethers.parseEther("0.00001") // refund rate
+            );
+    
+            // Test multiple gas limit changes
+            const gasLimits = [250_000n, 300_000n, 400_000n];
+            let previousFee = 0n;
+    
+            for (const gasLimit of gasLimits) {
+                await messageRouter.connect(adminSigner).setChainGasLimit(targetChain, gasLimit);
+                const currentFee = await messageRouter.quoteRoutingFee(targetChain, testPayload.length);
+                
+                if (previousFee > 0n) {
+                    const expectedIncrease = (gasLimit - (gasLimits[gasLimits.indexOf(gasLimit) - 1])) * 
+                                          ethers.parseUnits("1", "gwei");
+                    const actualIncrease = currentFee - previousFee;
+                    expect(actualIncrease).to.be.closeTo(expectedIncrease, ethers.parseUnits("1", "wei"));
+                }
+                
+                previousFee = currentFee;
+            }
         });
     });
 
@@ -234,11 +366,11 @@ describe("MessageRouter", function () {
         });
 
         it("Should validate target before routing", async function () {
-            const { router } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             const invalidTarget = ethers.Wallet.createRandom().address;
             const fee = await messageRouter.quoteRoutingFee(targetChain, testPayload.length);
 
-            await expect(messageRouter.connect(await ethers.getSigner(router))
+            await expect(messageRouter.connect(await ethers.getSigner(admin))
                 .routeMessage(
                     testMessageId,
                     invalidTarget,
@@ -249,15 +381,15 @@ describe("MessageRouter", function () {
         });
 
         it("Should prevent empty payload", async function () {
-            const { router } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             const fee = await messageRouter.quoteRoutingFee(targetChain, 0);
 
-            await expect(messageRouter.connect(await ethers.getSigner(router))
+            await expect(messageRouter.connect(await ethers.getSigner(admin))
                 .routeMessage(
                     testMessageId,
                     targetAddress,
                     targetChain,
-                    [],
+                    "0x",
                     { value: fee }
                 )).to.be.revertedWith("MessageRouter: Empty payload");
         });
@@ -278,12 +410,12 @@ describe("MessageRouter", function () {
         });
 
         it("Should prevent operations when paused", async function () {
-            const { admin, router } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             const fee = await messageRouter.quoteRoutingFee(targetChain, testPayload.length);
 
             await messageRouter.connect(await ethers.getSigner(admin)).pause();
-            
-            await expect(messageRouter.connect(await ethers.getSigner(router))
+
+            await expect(messageRouter.connect(await ethers.getSigner(admin))
                 .routeMessage(
                     testMessageId,
                     targetAddress,

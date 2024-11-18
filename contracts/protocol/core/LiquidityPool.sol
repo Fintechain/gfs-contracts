@@ -9,7 +9,7 @@ import "../../interfaces/ILiquidityPool.sol";
 
 /**
  * @title LiquidityPool
- * @notice Manages liquidity pools for cross-chain settlements
+ * @notice Manages liquidity pools for settlements
  */
 contract LiquidityPool is ILiquidityPool, AccessControl, Pausable, ReentrancyGuard {
     // Role definitions
@@ -18,19 +18,8 @@ contract LiquidityPool is ILiquidityPool, AccessControl, Pausable, ReentrancyGua
 
     // State variables
     mapping(address => PoolInfo) private pools;
-    mapping(bytes32 => TokenPair) private tokenPairs;
     mapping(bytes32 => uint256) private lockedAmounts;
     mapping(address => mapping(address => uint256)) private providerShares;
-    mapping(bytes32 => bool) private supportedPairLookup;
-    
-    TokenPair[] public supportedPairs;
-
-    // Events for pool management
-    event PoolCreated(address indexed token, uint256 minLiquidity, uint256 maxLiquidity);
-    event PoolUpdated(address indexed token, uint256 minLiquidity, uint256 maxLiquidity);
-    event PairAdded(address sourceToken, address targetToken, uint16 sourceChain, uint16 targetChain);
-    event LiquidityLocked(address indexed token, bytes32 indexed settlementId, uint256 amount);
-    event LiquidityReleased(address indexed token, bytes32 indexed settlementId, uint256 amount);
 
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -135,86 +124,50 @@ contract LiquidityPool is ILiquidityPool, AccessControl, Pausable, ReentrancyGua
             hasRole(SETTLEMENT_ROLE, msg.sender),
             "LiquidityPool: Must have settlement role"
         );
-        require(amount > 0, "LiquidityPool: Invalid amount");
-        require(
-            lockedAmounts[settlementId] == 0,
-            "LiquidityPool: Already locked"
-        );
-
-        PoolInfo storage pool = pools[token];
-        require(pool.isActive, "LiquidityPool: Pool not active");
-        require(
-            pool.availableLiquidity >= amount,
-            "LiquidityPool: Insufficient liquidity"
-        );
-
-        pool.availableLiquidity -= amount;
-        pool.lockedLiquidity += amount;
-        lockedAmounts[settlementId] = amount;
-
-        emit LiquidityLocked(token, settlementId, amount);
+        _lockLiquidity(token, amount, settlementId);
     }
 
     /**
-     * @notice Release locked liquidity
-     * @param token Token address
-     * @param amount Amount to release
-     * @param settlementId Associated settlement ID
+     * @notice Initiate a settlement and execute the token transfer
      */
-    function releaseLiquidity(
+    function initiateSettlement(
+        bytes32 settlementId,
         address token,
         uint256 amount,
-        bytes32 settlementId
+        address recipient
     ) external override whenNotPaused {
         require(
             hasRole(SETTLEMENT_ROLE, msg.sender),
             "LiquidityPool: Must have settlement role"
         );
-        require(
-            lockedAmounts[settlementId] >= amount,
-            "LiquidityPool: Invalid locked amount"
-        );
+        require(amount > 0, "LiquidityPool: Invalid amount");
 
-        PoolInfo storage pool = pools[token];
-        pool.availableLiquidity += amount;
-        pool.lockedLiquidity -= amount;
-        lockedAmounts[settlementId] -= amount;
+        require(_hasAvailableLiquidity(token, amount), "Insufficient liquidity");
 
-        emit LiquidityReleased(token, settlementId, amount);
+        _lockLiquidity(token, amount, settlementId);
+
+        IERC20(token).transfer(recipient, amount);
+
+        emit SettlementCompleted(settlementId, amount, recipient);
     }
 
     /**
      * @notice Check if pool has sufficient liquidity
-     * @param token Token address
-     * @param amount Required amount
-     * @return isAvailable Whether liquidity is available
      */
     function hasAvailableLiquidity(
         address token,
         uint256 amount
     ) external view override returns (bool) {
-        PoolInfo storage pool = pools[token];
-        return pool.isActive && pool.availableLiquidity >= amount;
+        return _hasAvailableLiquidity(token, amount);
     }
 
     /**
      * @notice Get pool information for token
-     * @param token Token address
-     * @return info Pool information
      */
     function getPoolInfo(
         address token
     ) external view override returns (PoolInfo memory) {
         return pools[token];
-    }
-
-    /**
-     * @notice Get supported token pairs
-     * @return pairs Array of supported token pairs
-     */
-    function getSupportedPairs(
-    ) external view override returns (TokenPair[] memory) {
-        return supportedPairs;
     }
 
     /**
@@ -254,47 +207,46 @@ contract LiquidityPool is ILiquidityPool, AccessControl, Pausable, ReentrancyGua
     }
 
     /**
-     * @notice Add supported token pair
+     * @notice Internal function for checking available liquidity
      */
-    function addTokenPair(
-        address sourceToken,
-        address targetToken,
-        uint16 sourceChain,
-        uint16 targetChain
-    ) external {
+    function _hasAvailableLiquidity(
+        address token,
+        uint256 amount
+    ) internal view returns (bool) {
+        PoolInfo storage pool = pools[token];
+        return pool.isActive && pool.availableLiquidity >= amount;
+    }
+
+    /**
+     * @notice Internal function for locking liquidity
+     */
+    function _lockLiquidity(
+        address token,
+        uint256 amount,
+        bytes32 settlementId
+    ) internal {
+        require(amount > 0, "LiquidityPool: Invalid amount");
         require(
-            hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
-            "LiquidityPool: Must have admin role"
+            lockedAmounts[settlementId] == 0,
+            "LiquidityPool: Already locked"
         );
 
-        bytes32 pairId = keccak256(
-            abi.encodePacked(sourceToken, targetToken, sourceChain, targetChain)
-        );
-        
+        PoolInfo storage pool = pools[token];
+        require(pool.isActive, "LiquidityPool: Pool not active");
         require(
-            !supportedPairLookup[pairId],
-            "LiquidityPool: Pair already exists"
+            pool.availableLiquidity >= amount,
+            "LiquidityPool: Insufficient liquidity"
         );
 
-        TokenPair memory pair = TokenPair({
-            sourceToken: sourceToken,
-            targetToken: targetToken,
-            sourceChain: sourceChain,
-            targetChain: targetChain,
-            isSupported: true
-        });
+        pool.availableLiquidity -= amount;
+        pool.lockedLiquidity += amount;
+        lockedAmounts[settlementId] = amount;
 
-        tokenPairs[pairId] = pair;
-        supportedPairs.push(pair);
-        supportedPairLookup[pairId] = true;
-
-        emit PairAdded(sourceToken, targetToken, sourceChain, targetChain);
+        emit LiquidityLocked(token, settlementId, amount);
     }
 
     /**
      * @notice Get total shares for a token
-     * @param token Token address
-     * @return total Total shares
      */
     function _totalShares(address token) internal view returns (uint256) {
         uint256 total = 0;

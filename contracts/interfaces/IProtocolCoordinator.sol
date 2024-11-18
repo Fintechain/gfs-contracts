@@ -4,8 +4,7 @@ pragma solidity ^0.8.19;
 /**
  * @title IProtocolCoordinator
  * @notice Main entry point and orchestration interface for the GFS Protocol
- * @dev Coordinates interactions between MessageRegistry, MessageRouter, MessageProcessor,
- *      SettlementController, and other protocol components
+ * @dev Coordinates message submission, routing, and processing while relying
  */
 interface IProtocolCoordinator {
     /**
@@ -14,28 +13,12 @@ interface IProtocolCoordinator {
      * @param target Destination address for the message
      * @param targetChain Chain ID where the target is located
      * @param payload Encoded ISO20022 message data
-     * @param settlementData Optional settlement information if value transfer is required
      */
     struct MessageSubmission {
         bytes32 messageType;
         address target;
         uint16 targetChain;
         bytes payload;
-        SettlementInfo settlementData;
-    }
-
-    /**
-     * @notice Struct to hold settlement-related information
-     * @param sourceToken Token address on source chain
-     * @param targetToken Token address on target chain
-     * @param amount Amount to be settled
-     * @param recipient Recipient address for settlement
-     */
-    struct SettlementInfo {
-        address sourceToken;
-        address targetToken;
-        uint256 amount;
-        address recipient;
     }
 
     /**
@@ -57,19 +40,15 @@ interface IProtocolCoordinator {
     /**
      * @notice Event emitted when message processing is completed
      * @param messageId Unique identifier for the message
-     * @param status Final status of the message
-     * @param settlementId Associated settlement ID if applicable
      */
     event MessageProcessingCompleted(
-        bytes32 indexed messageId,
-        uint8 status,
-        bytes32 indexed settlementId
+        bytes32 indexed messageId
     );
 
     /**
      * @notice Submit a new ISO20022 message to the protocol
-     * @dev Main entry point for message submission. Handles validation, routing, and settlement initiation
-     * @param submission MessageSubmission struct containing all message details
+     * @dev Main entry point for message submission. Handles validation and routing
+     * @param submission MessageSubmission struct containing message details
      * @return messageId Unique identifier for tracking the message
      */
     function submitMessage(
@@ -78,34 +57,30 @@ interface IProtocolCoordinator {
 
     /**
      * @notice Quote the total fee required for message submission
-     * @dev Calculates all required fees including routing, processing, and settlement if needed
+     * @dev Calculates protocol fee and delivery fee based on target chain
      * @param submission MessageSubmission struct containing message details
      * @return baseFee Base protocol fee
-     * @return deliveryFee Fee for message delivery
-     * @return settlementFee Fee for settlement if required
+     * @return deliveryFee Fee for message delivery to target chain
      */
     function quoteMessageFee(
         MessageSubmission calldata submission
     ) external view returns (
         uint256 baseFee,
-        uint256 deliveryFee,
-        uint256 settlementFee
+        uint256 deliveryFee
     );
 
     /**
-     * @notice Get the current status of a submitted message
-     * @dev Returns comprehensive status including routing and settlement status if applicable
+     * @notice Get detailed processing result for a message
+     * @dev Returns the raw processing result data
      * @param messageId ID of the message to query
-     * @return processingStatus Current message processing status
-     * @return settlementId Associated settlement ID if exists
-     * @return settlementStatus Current settlement status if exists
+     * @return success Whether processing was successful
+     * @return result Detailed processing result data
      */
-    function getMessageStatus(
+    function getMessageResult(
         bytes32 messageId
     ) external view returns (
-        uint8 processingStatus,
-        bytes32 settlementId,
-        uint8 settlementStatus
+        bool success,
+        bytes memory result
     );
 
     /**
@@ -120,7 +95,7 @@ interface IProtocolCoordinator {
 
     /**
      * @notice Cancel a pending message that hasn't been processed
-     * @dev Only allowed for messages in specific states and by original sender
+     * @dev Only allowed for messages in PENDING state and by original sender
      * @param messageId ID of the message to cancel
      * @return success Whether cancellation was successful
      */
@@ -148,34 +123,6 @@ interface IProtocolCoordinator {
     function emergencyCancelMessage(
         bytes32 messageId
     ) external returns (bool success);
-
-    /**
-     * @notice Check if a message requires settlement
-     * @dev Analyzes message type and content to determine settlement requirement
-     * @param messageType Type of ISO20022 message
-     * @param payload Encoded message data
-     * @return requiresSettlement Whether settlement is required
-     */
-    function messageRequiresSettlement(
-        bytes32 messageType,
-        bytes calldata payload
-    ) external view returns (bool requiresSettlement);
-
-    /**
-     * @notice Get detailed processing result for a message
-     * @dev Returns comprehensive information about message processing outcome
-     * @param messageId ID of the message to query
-     * @return success Whether processing was successful
-     * @return result Detailed processing result data
-     * @return settlementData Settlement information if applicable
-     */
-    function getMessageResult(
-        bytes32 messageId
-    ) external view returns (
-        bool success,
-        bytes memory result,
-        bytes memory settlementData
-    );
 
     /**
      * @notice Returns active protocol configuration

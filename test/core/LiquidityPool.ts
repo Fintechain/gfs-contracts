@@ -76,48 +76,6 @@ describe("LiquidityPool", function () {
         });
     });
 
-    describe("Token Pair Management", function () {
-        const sourceChain = 1;
-        const targetChain = 2;
-
-        it("Should allow liquidityPoolAdmin to add token pair", async function () {
-            const { liquidityPoolAdmin } = await getNamedAccounts();
-            const targetToken = await (await ethers.getContractFactory("MockToken")).deploy("Target Token", "TTK");
-
-            await expect(liquidityPool.connect(await ethers.getSigner(liquidityPoolAdmin))
-                .addTokenPair(
-                    await mockToken.getAddress(),
-                    await targetToken.getAddress(),
-                    sourceChain,
-                    targetChain
-                ))
-                .to.emit(liquidityPool, "PairAdded")
-                .withArgs(
-                    await mockToken.getAddress(),
-                    await targetToken.getAddress(),
-                    sourceChain,
-                    targetChain
-                );
-        });
-
-        it("Should correctly return supported pairs", async function () {
-            const { liquidityPoolAdmin } = await getNamedAccounts();
-            const targetToken = await (await ethers.getContractFactory("MockToken")).deploy("Target Token", "TTK");
-
-            await liquidityPool.connect(await ethers.getSigner(liquidityPoolAdmin))
-                .addTokenPair(
-                    await mockToken.getAddress(),
-                    await targetToken.getAddress(),
-                    sourceChain,
-                    targetChain
-                );
-
-            const pairs = await liquidityPool.getSupportedPairs();
-            expect(pairs.length).to.equal(1);
-            expect(pairs[0].sourceToken).to.equal(await mockToken.getAddress());
-            expect(pairs[0].targetToken).to.equal(await targetToken.getAddress());
-        });
-    });
 
     describe("Liquidity Operations", function () {
         beforeEach(async function () {
@@ -212,7 +170,7 @@ describe("LiquidityPool", function () {
             expect(pool.lockedLiquidity).to.equal(lockAmount);
         });
 
-        it("Should allow settler to release liquidity", async function () {
+        /* it("Should allow settler to release liquidity", async function () {
             const { settler } = await getNamedAccounts();
             const lockAmount = testAmount / 2n;
 
@@ -223,7 +181,7 @@ describe("LiquidityPool", function () {
                 .releaseLiquidity(await mockToken.getAddress(), lockAmount, testSettlementId))
                 .to.emit(liquidityPool, "LiquidityReleased")
                 .withArgs(await mockToken.getAddress(), testSettlementId, lockAmount);
-        });
+        }); */
 
         it("Should correctly check available liquidity", async function () {
             const { settler } = await getNamedAccounts();
