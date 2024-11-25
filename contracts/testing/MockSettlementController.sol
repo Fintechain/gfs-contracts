@@ -4,8 +4,14 @@ pragma solidity ^0.8.19;
 import "../interfaces/ISettlementController.sol";
 
 contract MockSettlementController is ISettlementController {
+    bytes32 public mockSettlementId = bytes32(uint256(1));
     mapping(bytes32 => Settlement) internal settlements;
     mapping(bytes32 => bytes32[]) internal messageSettlements;
+
+    // Function to set a specific settlement ID for testing
+    function setMockSettlementId(bytes32 _settlementId) external {
+        mockSettlementId = _settlementId;
+    }
 
     function processSettlement(
         bytes32 messageId,
@@ -13,12 +19,10 @@ contract MockSettlementController is ISettlementController {
         uint256 amount,
         address recipient
     ) external returns (bytes32) {
-        bytes32 settlementId = bytes32(uint256(1));
+        emit SettlementProcessed(mockSettlementId, messageId, amount, recipient);
+        emit SettlementStatusUpdated(mockSettlementId, SettlementStatus.COMPLETED);
         
-        emit SettlementProcessed(settlementId, messageId, amount, recipient);
-        emit SettlementStatusUpdated(settlementId, SettlementStatus.COMPLETED);
-        
-        return settlementId;
+        return mockSettlementId;
     }
 
     function getSettlement(

@@ -4,7 +4,11 @@ import '@nomicfoundation/hardhat-ethers';
 import 'hardhat-deploy';
 import 'hardhat-deploy-ethers';
 import '@nomicfoundation/hardhat-chai-matchers'
+import "dotenv/config";
 
+const MNEMONIC = process.env.MNEMONIC || "";
+const RPC_URL = process.env.ALCHEMY_API_URL || ""
+const LOCALHOST_RPC_URL = process.env.LOCALHOST_RPC_URL || ""
 
 const config: HardhatUserConfig = {
     solidity: {
@@ -76,11 +80,40 @@ const config: HardhatUserConfig = {
         },
     },
     networks: {
+        // Hardhat network for unit testing
         hardhat: {
+            tags: ["unit"], // Tag for unit testing
+            /*
+            forking: {
+                url: TESTNET_RPC_URL, // Replace with actual RPC URL
+                // blockNumber: TESTNET_BLOCK_NUMBER, // Use for reproducible tests
+                enabled: true
+            },
+            */
             accounts: {
-                count: 10, // Ensure we have enough accounts for testing
-            }
-        }
+                count: 10, // Enough accounts for unit tests
+                mnemonic: MNEMONIC, // Optional, for deterministic accounts
+            },
+            live: false, // Not a live network
+        },
+        // Custom integration testing network
+        gana: {
+            url: LOCALHOST_RPC_URL, // Custom URL for integration testing
+            accounts: {
+                count: 10, // Enough accounts for integration tests
+                mnemonic: MNEMONIC, // Optional, for deterministic accounts
+            },
+            live: true, // Not a live network
+            chainId: 1337, // 
+        },
+        // Sepolia testnet for live testing
+        sepolia: {
+            url: RPC_URL, // Replace with actual RPC URL
+            accounts: {
+                mnemonic: MNEMONIC, // Same mnemonic across environments for simplicity
+            },
+            chainId: 11155111, // Explicit Sepolia chain ID
+        },
     },
     typechain: {
         outDir: "typechain",

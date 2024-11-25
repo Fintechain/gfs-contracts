@@ -17,6 +17,9 @@ contract MessageRouter is
     Pausable,
     ReentrancyGuard
 {
+    // Constants for chain identification
+    uint16 public constant LOCAL_CHAIN = 0; // Special value for local routing
+
     // Role definitions
     bytes32 public constant ROUTER_ROLE = keccak256("ROUTER_ROLE");
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
@@ -74,13 +77,13 @@ contract MessageRouter is
         uint256 payloadSize
     ) public view override returns (uint256) {
         // For local delivery, only charge local processing fee
-        if (targetChain == block.chainid) {
+        if (isLocalDelivery(targetChain)) {
             return calculateLocalRoutingFee(payloadSize);
         }
 
         // For cross-chain delivery, include our processing fee plus Wormhole fees
         uint256 processingFee = calculateCrossChainProcessingFee(payloadSize);
-        
+
         uint256 gasLimit = chainGasLimits[targetChain] == 0
             ? GAS_LIMIT
             : chainGasLimits[targetChain];
@@ -94,8 +97,6 @@ contract MessageRouter is
         return processingFee + deliveryCost + wormhole.messageFee();
     }
 
-    
-
     function setCrossChainFeeParameters(
         uint256 baseFee,
         uint256 feeMultiplier
@@ -104,11 +105,60 @@ contract MessageRouter is
             hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
             "MessageRouter: Must have admin role"
         );
-        
+
         baseCrossChainFee = baseFee;
         crossChainFeeMultiplier = feeMultiplier;
-        
+
         emit CrossChainFeesUpdated(baseFee, feeMultiplier);
+    }
+
+    // Convert uint16 to string
+    function uint16ToString(uint16 number) public pure returns (string memory) {
+        if (number == 0) {
+            return "0";
+        }
+
+        uint16 temp = number;
+        uint256 digits;
+
+        // Count digits
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+
+        bytes memory buffer = new bytes(digits);
+        while (number != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + (number % 10)));
+            number /= 10;
+        }
+
+        return string(buffer);
+    }
+
+    // Concatenate strings
+    function concatenateStrings(
+        string memory a,
+        string memory b
+    ) public pure returns (string memory) {
+        return string(abi.encodePacked(a, b));
+    }
+
+    function addressToString(address _addr) internal pure returns (string memory) {
+        bytes memory addrBytes = abi.encodePacked(_addr);
+        bytes memory hexChars = "0123456789abcdef";
+        bytes memory str = new bytes(42); // 2 for "0x" and 40 for the address
+
+        str[0] = "0";
+        str[1] = "x";
+
+        for (uint256 i = 0; i < 20; i++) {
+            str[2 + i * 2] = hexChars[uint8(addrBytes[i] >> 4)];
+            str[3 + i * 2] = hexChars[uint8(addrBytes[i] & 0x0f)];
+        }
+
+        return string(str);
     }
 
     /**
@@ -136,17 +186,24 @@ contract MessageRouter is
             hasRole(ROUTER_ROLE, msg.sender),
             "MessageRouter: Must have router role"
         );
+
         require(
             canRouteToTarget(target, targetChain),
             "MessageRouter: Invalid target"
         );
+
+        /* 
+        require(
+            canRouteToTarget(target, targetChain),
+            concatenateStrings("MessageRouter: Invalid target, ", concatenateStrings(uint16ToString(targetChain), addressToString(target)))
+        ); */
         require(payload.length > 0, "MessageRouter: Empty payload");
 
         uint256 deliveryCost = quoteRoutingFee(targetChain, payload.length);
         require(msg.value >= deliveryCost, "MessageRouter: Insufficient fee");
 
         bytes32 deliveryHash;
-        if (targetChain == block.chainid) {
+        if (isLocalDelivery(targetChain)) {
             // Local delivery
             deliveryHash = _routeLocal(messageId, target, payload);
 
@@ -183,6 +240,15 @@ contract MessageRouter is
                 deliveryHash: deliveryHash,
                 timestamp: block.timestamp
             });
+    }
+
+    /**
+     * @notice Determine if a message should be processed locally
+     * @param targetChain The target chain ID
+     * @return true if message should be processed locally
+     */
+    function isLocalDelivery(uint16 targetChain) public view returns (bool) {
+        return targetChain == LOCAL_CHAIN;
     }
 
     /**
@@ -231,13 +297,15 @@ contract MessageRouter is
         bytes memory payload
     ) private returns (bytes32) {
         // Calculate our processing fee to keep
-        uint256 processingFee = calculateCrossChainProcessingFee(payload.length);
-        
+        uint256 processingFee = calculateCrossChainProcessingFee(
+            payload.length
+        );
+
         // Calculate Wormhole fees
         uint256 gasLimit = chainGasLimits[targetChain] == 0
             ? GAS_LIMIT
             : chainGasLimits[targetChain];
-            
+
         (uint256 deliveryCost, ) = wormholeRelayer.quoteEVMDeliveryPrice(
             targetChain,
             payload.length,
@@ -283,6 +351,7 @@ contract MessageRouter is
         uint16 targetChain
     ) public view override returns (bool) {
         return targetRegistry.isValidTarget(target, targetChain);
+        //return true;
     }
 
     /**

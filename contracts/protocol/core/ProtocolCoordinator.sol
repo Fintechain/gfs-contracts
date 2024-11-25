@@ -41,7 +41,10 @@ contract ProtocolCoordinator is
     mapping(bytes32 => address) private messageSenders;
 
     // Events
-    event ComponentUpdated(bytes32 indexed component, address indexed newAddress);
+    event ComponentUpdated(
+        bytes32 indexed component,
+        address indexed newAddress
+    );
     event FeeUpdated(uint256 newBaseFee);
     event MessageRetryInitiated(bytes32 indexed messageId);
 
@@ -74,7 +77,10 @@ contract ProtocolCoordinator is
     ) external payable override whenNotPaused nonReentrant returns (bytes32) {
         // Validate submission
         require(submission.payload.length > 0, "Empty payload");
-        require(submission.payload.length <= MAX_MESSAGE_SIZE, "Payload too large");
+        require(
+            submission.payload.length <= MAX_MESSAGE_SIZE,
+            "Payload too large"
+        );
         require(submission.target != address(0), "Invalid target");
 
         // Calculate and verify fees
@@ -114,6 +120,19 @@ contract ProtocolCoordinator is
             submission.payload
         );
 
+        // For local messages (targetChain == 0), mark as processed immediately
+        if (submission.targetChain == 0) {
+            messageRegistry.updateMessageStatus(
+                messageId,
+                IMessageRegistry.MessageStatus.DELIVERED
+            );
+
+            messageRegistry.updateMessageStatus(
+                messageId,
+                IMessageRegistry.MessageStatus.PROCESSED
+            );
+        }
+
         emit MessageSubmissionInitiated(
             messageId,
             msg.sender,
@@ -140,10 +159,10 @@ contract ProtocolCoordinator is
         bytes32 messageId
     ) external view override returns (bool success, bytes memory result) {
         require(messageExists(messageId), "Message not found");
-        
+
         IMessageProcessor.ProcessingResult memory procResult = messageProcessor
             .getProcessingStatus(messageId);
-        
+
         return (procResult.success, procResult.result);
     }
 
@@ -176,10 +195,11 @@ contract ProtocolCoordinator is
         require(messageExists(messageId), "Message not found");
         require(messageSenders[messageId] == msg.sender, "Not message sender");
 
-        IMessageRegistry.MessageStatus status = messageRegistry.getMessageStatus(messageId);
+        IMessageRegistry.MessageStatus status = messageRegistry
+            .getMessageStatus(messageId);
         require(
             status == IMessageRegistry.MessageStatus.PENDING ||
-            status == IMessageRegistry.MessageStatus.FAILED,
+                status == IMessageRegistry.MessageStatus.FAILED,
             "Cannot cancel message"
         );
 
@@ -198,7 +218,10 @@ contract ProtocolCoordinator is
     function emergencyCancelMessage(
         bytes32 messageId
     ) external override returns (bool) {
-        require(hasRole(EMERGENCY_ROLE, msg.sender), "Caller not emergency admin");
+        require(
+            hasRole(EMERGENCY_ROLE, msg.sender),
+            "Caller not emergency admin"
+        );
         require(messageExists(messageId), "Message not found");
 
         messageRegistry.updateMessageStatus(
@@ -232,14 +255,15 @@ contract ProtocolCoordinator is
     }
 
     function getProtocolConfig() external view override returns (bytes memory) {
-        return abi.encode(
-            baseFee,
-            MAX_MESSAGE_SIZE,
-            address(messageRegistry),
-            address(messageProtocol),
-            address(messageRouter),
-            address(messageProcessor)
-        );
+        return
+            abi.encode(
+                baseFee,
+                MAX_MESSAGE_SIZE,
+                address(messageRegistry),
+                address(messageProtocol),
+                address(messageRouter),
+                address(messageProcessor)
+            );
     }
 
     function updateBaseFee(uint256 newBaseFee) external {
@@ -253,7 +277,10 @@ contract ProtocolCoordinator is
     }
 
     function pause() external {
-        require(hasRole(EMERGENCY_ROLE, msg.sender), "Caller not emergency admin");
+        require(
+            hasRole(EMERGENCY_ROLE, msg.sender),
+            "Caller not emergency admin"
+        );
         _pause();
     }
 
