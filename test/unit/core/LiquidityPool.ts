@@ -6,6 +6,9 @@ describe("LiquidityPool", function () {
     let liquidityPool: LiquidityPool;
     let mockToken: IERC20;
     
+    let settler: string;
+    let provider: string;
+
     const minLiquidity = ethers.parseEther("100");
     const maxLiquidity = ethers.parseEther("10000");
     const testAmount = ethers.parseEther("1000");
@@ -14,7 +17,15 @@ describe("LiquidityPool", function () {
     beforeEach(async function () {
         await deployments.fixture(['LiquidityPool']);
 
-        const { liquidityPoolAdmin, provider, settler } = await getNamedAccounts();
+        const { admin } = await getNamedAccounts();
+
+        const signers = await ethers.getSigners();
+        // Validate that there are enough signers for testing
+        if (signers.length < 3) {
+            throw new Error("Not enough accounts available. At least 3 are required for testing.");
+        }
+        settler = signers[2].address;
+        provider = signers[3].address;
 
         const LiquidityPoolDeployment = await deployments.get('LiquidityPool');
         liquidityPool = await ethers.getContractAt('LiquidityPool', LiquidityPoolDeployment.address);
@@ -27,33 +38,32 @@ describe("LiquidityPool", function () {
         const providerRole = await liquidityPool.LIQUIDITY_PROVIDER_ROLE();
         const settlementRole = await liquidityPool.SETTLEMENT_ROLE();
 
-        await liquidityPool.connect(await ethers.getSigner(liquidityPoolAdmin)).grantRole(providerRole, provider);
-        await liquidityPool.connect(await ethers.getSigner(liquidityPoolAdmin)).grantRole(settlementRole, settler);
+        await liquidityPool.connect(await ethers.getSigner(admin)).grantRole(providerRole, provider);
+        await liquidityPool.connect(await ethers.getSigner(admin)).grantRole(settlementRole, settler);
 
         // Create pool
-        await liquidityPool.connect(await ethers.getSigner(liquidityPoolAdmin))
+        await liquidityPool.connect(await ethers.getSigner(admin))
             .createPool(await mockToken.getAddress(), minLiquidity, maxLiquidity);
     });
 
     describe("Deployment", function () {
-        it("Should set the correct liquidityPoolAdmin", async function () {
-            const { liquidityPoolAdmin } = await getNamedAccounts();
-            expect(await liquidityPool.hasRole(await liquidityPool.DEFAULT_ADMIN_ROLE(), liquidityPoolAdmin)).to.be.true;
+        it("Should set the correct admin", async function () {
+            const { admin } = await getNamedAccounts();
+            expect(await liquidityPool.hasRole(await liquidityPool.DEFAULT_ADMIN_ROLE(), admin)).to.be.true;
         });
 
         it("Should set initial roles correctly", async function () {
-            const { provider, settler } = await getNamedAccounts();
             expect(await liquidityPool.hasRole(await liquidityPool.LIQUIDITY_PROVIDER_ROLE(), provider)).to.be.true;
             expect(await liquidityPool.hasRole(await liquidityPool.SETTLEMENT_ROLE(), settler)).to.be.true;
         });
     });
 
     describe("Pool Management", function () {
-        it("Should allow liquidityPoolAdmin to create pool", async function () {
-            const { liquidityPoolAdmin } = await getNamedAccounts();
+        it("Should allow admin to create pool", async function () {
+            const { admin } = await getNamedAccounts();
             const newToken = await (await ethers.getContractFactory("MockERC20Token")).deploy("New Token", "NTK");
 
-            await expect(liquidityPool.connect(await ethers.getSigner(liquidityPoolAdmin))
+            await expect(liquidityPool.connect(await ethers.getSigner(admin))
                 .createPool(await newToken.getAddress(), minLiquidity, maxLiquidity))
                 .to.emit(liquidityPool, "PoolCreated")
                 .withArgs(await newToken.getAddress(), minLiquidity, maxLiquidity);
@@ -66,11 +76,10 @@ describe("LiquidityPool", function () {
             expect(poolInfo.isActive).to.be.true;
         });
 
-        it("Should revert if non-liquidityPoolAdmin tries to create pool", async function () {
-            const { user } = await getNamedAccounts();
+        it("Should revert if non-admin tries to create pool", async function () {
             const newToken = await (await ethers.getContractFactory("MockERC20Token")).deploy("New Token", "NTK");
 
-            await expect(liquidityPool.connect(await ethers.getSigner(user))
+            await expect(liquidityPool.connect(await ethers.getSigner(settler))
                 .createPool(await newToken.getAddress(), minLiquidity, maxLiquidity))
                 .to.be.revertedWith("LiquidityPool: Must have admin role");
         });
@@ -79,7 +88,6 @@ describe("LiquidityPool", function () {
 
     describe("Liquidity Operations", function () {
         beforeEach(async function () {
-            const { provider } = await getNamedAccounts();
             
             // Mint tokens to provider
             await mockToken.mint(provider, testAmount);
@@ -89,7 +97,6 @@ describe("LiquidityPool", function () {
         });
 
         it("Should allow provider to add liquidity", async function () {
-            const { provider } = await getNamedAccounts();
             
             await expect(liquidityPool.connect(await ethers.getSigner(provider))
                 .addLiquidity(await mockToken.getAddress(), testAmount))
@@ -98,7 +105,6 @@ describe("LiquidityPool", function () {
         });
 
         it("Should correctly calculate shares", async function () {
-            const { provider } = await getNamedAccounts();
             
             const tx = await liquidityPool.connect(await ethers.getSigner(provider))
                 .addLiquidity(await mockToken.getAddress(), testAmount);
@@ -110,7 +116,6 @@ describe("LiquidityPool", function () {
         });
 
         it("Should allow liquidity removal", async function () {
-            const { provider } = await getNamedAccounts();
             
             // Add liquidity first
             await liquidityPool.connect(await ethers.getSigner(provider))
@@ -125,7 +130,6 @@ describe("LiquidityPool", function () {
         });
 
         it("Should revert if removing more than available", async function () {
-            const { provider } = await getNamedAccounts();
             
             await liquidityPool.connect(await ethers.getSigner(provider))
                 .addLiquidity(await mockToken.getAddress(), testAmount);
@@ -138,7 +142,6 @@ describe("LiquidityPool", function () {
 
     describe("Settlement Operations", function () {
         beforeEach(async function () {
-            const { provider } = await getNamedAccounts();
             
             // Add initial liquidity
             await mockToken.mint(provider, testAmount);
@@ -149,7 +152,6 @@ describe("LiquidityPool", function () {
         });
 
         it("Should allow settler to lock liquidity", async function () {
-            const { settler } = await getNamedAccounts();
             const lockAmount = testAmount / 2n;
 
             await expect(liquidityPool.connect(await ethers.getSigner(settler))
@@ -159,7 +161,6 @@ describe("LiquidityPool", function () {
         });
 
         it("Should update available liquidity after lock", async function () {
-            const { settler } = await getNamedAccounts();
             const lockAmount = testAmount / 2n;
 
             await liquidityPool.connect(await ethers.getSigner(settler))
@@ -184,7 +185,6 @@ describe("LiquidityPool", function () {
         }); */
 
         it("Should correctly check available liquidity", async function () {
-            const { settler } = await getNamedAccounts();
             const lockAmount = testAmount / 2n;
 
             await liquidityPool.connect(await ethers.getSigner(settler))
@@ -205,25 +205,25 @@ describe("LiquidityPool", function () {
     });
 
     describe("Emergency Controls", function () {
-        it("Should allow liquidityPoolAdmin to pause", async function () {
-            const { liquidityPoolAdmin } = await getNamedAccounts();
-            await liquidityPool.connect(await ethers.getSigner(liquidityPoolAdmin)).pause();
+        it("Should allow admin to pause", async function () {
+            const { admin } = await getNamedAccounts();
+            await liquidityPool.connect(await ethers.getSigner(admin)).pause();
             expect(await liquidityPool.paused()).to.be.true;
         });
 
         it("Should prevent operations when paused", async function () {
-            const { liquidityPoolAdmin, provider } = await getNamedAccounts();
-            await liquidityPool.connect(await ethers.getSigner(liquidityPoolAdmin)).pause();
+            const { admin } = await getNamedAccounts();
+            await liquidityPool.connect(await ethers.getSigner(admin)).pause();
             
             await expect(liquidityPool.connect(await ethers.getSigner(provider))
                 .addLiquidity(await mockToken.getAddress(), testAmount))
                 .to.be.reverted;
         });
 
-        it("Should allow liquidityPoolAdmin to unpause", async function () {
-            const { liquidityPoolAdmin } = await getNamedAccounts();
-            await liquidityPool.connect(await ethers.getSigner(liquidityPoolAdmin)).pause();
-            await liquidityPool.connect(await ethers.getSigner(liquidityPoolAdmin)).unpause();
+        it("Should allow admin to unpause", async function () {
+            const { admin } = await getNamedAccounts();
+            await liquidityPool.connect(await ethers.getSigner(admin)).pause();
+            await liquidityPool.connect(await ethers.getSigner(admin)).unpause();
             expect(await liquidityPool.paused()).to.be.false;
         });
     });

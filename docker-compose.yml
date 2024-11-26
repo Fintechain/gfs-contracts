@@ -1,0 +1,54 @@
+# docker-compose.yml
+version: "3.8"
+
+services:
+  ganache:
+    image: trufflesuite/ganache-cli
+    container_name: ganache
+    ports:
+      - "${GANACHE_PORT}:${GANACHE_PORT}"
+    environment:
+      - MNEMONIC=${MNEMONIC}
+    command: >
+      --host 0.0.0.0
+      --port ${GANACHE_PORT}
+      --mnemonic ${MNEMONIC}
+      --networkId 5777
+      --defaultBalanceEther 1000
+      --accounts 10
+
+  geth:
+    image: ethereum/client-go:stable
+    container_name: geth
+    ports:
+      - "${GETH_RPC_PORT}:${GETH_RPC_PORT}"
+      - "30303:30303"
+    entrypoint:
+      - geth
+      - --dev
+      - --http
+      - --http.addr=0.0.0.0
+      - --http.port=${GETH_RPC_PORT}
+      - --http.api=personal,eth,net,web3
+      - --allow-insecure-unlock
+
+  hardhat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hardhat
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    depends_on:
+      - ganache
+      - geth
+    environment:
+      - MNEMONIC=${MNEMONIC}
+      - HARDHAT_PORT=${HARDHAT_PORT}
+    ports:
+      - "${HARDHAT_PORT}:8545"
+    command: npx hardhat node
+
+volumes:
+  node_modules:

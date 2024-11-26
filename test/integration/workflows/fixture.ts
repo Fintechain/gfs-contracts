@@ -5,11 +5,11 @@ import {
 } from "../../../typechain";
 
 export async function deployContractsFixture() {
-    /* const deployResult = await deployments.fixture([
+    const deployResult = await deployments.fixture([
         'PACS008Handler'
     ], {
         keepExistingDeployments: false
-    }); */
+    });
     
     // Get contract instances
     let protocolCoordinator = await ethers.getContract<ProtocolCoordinator>("ProtocolCoordinator");

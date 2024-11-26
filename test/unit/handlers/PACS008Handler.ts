@@ -6,6 +6,7 @@ describe("PACS008Handler", function () {
     let pacs008Handler: any;
     let settlementController: any;
     let mockToken: any;
+    let user: string;
 
     const MESSAGE_TYPE_PACS008 = ethers.keccak256(ethers.toUtf8Bytes("pacs.008"));
     const MAXIMUM_AMOUNT = ethers.parseEther("1000000");  // 1 million
@@ -17,6 +18,13 @@ describe("PACS008Handler", function () {
         await deployments.fixture(['PACS008Handler']);
 
         const { admin } = await getNamedAccounts();
+        const signers = await ethers.getSigners();
+        // Validate that there are enough signers for testing
+        if (signers.length < 3) {
+            throw new Error("Not enough accounts available. At least 3 are required for testing.");
+        }
+
+        user = signers[2].address;
 
         // Get deployed contract instances
         const mockTokenDeployment = await deployments.get('MockERC20Token');
@@ -174,9 +182,6 @@ describe("PACS008Handler", function () {
 
     describe("Access Control", function () {
         it("Should reject unauthorized processors", async function () {
-
-            const { user } = await getNamedAccounts();
-
             const messageId = ethers.keccak256(ethers.toUtf8Bytes("test-message"));
             const payload = CreatePACS008Payload(
                 ethers.Wallet.createRandom().address,
@@ -224,7 +229,6 @@ describe("PACS008Handler", function () {
         });
 
         it("Should prevent non-admin from pausing", async function () {
-            const { user } = await getNamedAccounts();
             await expect(
                 pacs008Handler.connect(await ethers.getSigner(user)).pause()
             ).to.be.revertedWith("Unauthorized");

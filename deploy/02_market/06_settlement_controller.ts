@@ -4,6 +4,7 @@ import { SettlementController } from "../../typechain";
 import { COMMON_DEPLOY_PARAMS, MARKET_NAME } from "../../src/env";
 import { isTestnetMarket, loadProtocolConfig } from "../../src/market-config-helpers";
 import { network } from "hardhat";
+import { isUnitMode } from "../../src/utils/deploy-helper";
 
 const func: DeployFunction = async function ({
     getNamedAccounts,
@@ -11,13 +12,13 @@ const func: DeployFunction = async function ({
     ...hre
 }: HardhatRuntimeEnvironment) {
     const { deploy, get } = deployments;
-    const { deployer, admin } = await getNamedAccounts();
+    const { admin } = await getNamedAccounts();
 
     var liquidityPool;
 
     // Get dependency addresses
     // Note: These contracts should be deployed before SettlementController
-    if (!network.live) {
+    if (isUnitMode()) {
         await deploy("MockSettlementController", { from: admin, args: [],  ...COMMON_DEPLOY_PARAMS });
         
         liquidityPool = (await get("MockLiquidityPool")).address;

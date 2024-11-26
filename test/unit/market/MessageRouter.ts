@@ -51,7 +51,13 @@ describe("MessageRouter", function () {
         );
  */
         // Initialize targetAddress
-        const { voter } = await getNamedAccounts();
+        const signers = await ethers.getSigners();
+        // Validate that there are enough signers for testing
+        if (signers.length < 3) {
+            throw new Error("Not enough accounts available. At least 3 are required for testing.");
+        }
+
+        let voter = signers[2].address;
         targetAddress = voter;
         await mockTargetRegistry.setValidTarget(targetAddress, targetChain, true);
     });
@@ -64,7 +70,7 @@ describe("MessageRouter", function () {
         beforeEach(async function () {
             const { admin } = await getNamedAccounts();
             adminSigner = await ethers.getSigner(admin);
-            currentChainId = 0 //Number(await ethers.provider.getNetwork().then(n => n.chainId));
+            currentChainId = 1 //Number(await ethers.provider.getNetwork().then(n => n.chainId));
 
             // Deploy and setup mock handler
             mockTarget = await ethers.deployContract("MockMessageHandler");

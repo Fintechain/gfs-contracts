@@ -18,7 +18,7 @@ contract MessageRouter is
     ReentrancyGuard
 {
     // Constants for chain identification
-    uint16 public constant LOCAL_CHAIN = 0; // Special value for local routing
+    uint16 public constant LOCAL_CHAIN = 1; // Special value for local routing
 
     // Role definitions
     bytes32 public constant ROUTER_ROLE = keccak256("ROUTER_ROLE");
@@ -142,10 +142,12 @@ contract MessageRouter is
         string memory a,
         string memory b
     ) public pure returns (string memory) {
-        return string(abi.encodePacked(a, b));
+        return string(abi.encodePacked(a, " ", b));
     }
 
-    function addressToString(address _addr) internal pure returns (string memory) {
+    function addressToString(
+        address _addr
+    ) internal pure returns (string memory) {
         bytes memory addrBytes = abi.encodePacked(_addr);
         bytes memory hexChars = "0123456789abcdef";
         bytes memory str = new bytes(42); // 2 for "0x" and 40 for the address
@@ -186,11 +188,16 @@ contract MessageRouter is
             hasRole(ROUTER_ROLE, msg.sender),
             "MessageRouter: Must have router role"
         );
-
         require(
             canRouteToTarget(target, targetChain),
             "MessageRouter: Invalid target"
         );
+        /* require(
+            canRouteToTarget(target, targetChain), 
+            concatenateStrings("MessageRouter: Invalid target", 
+            concatenateStrings(uint16ToString(targetChain), addressToString(target))
+            )
+        ); */
 
         /* 
         require(

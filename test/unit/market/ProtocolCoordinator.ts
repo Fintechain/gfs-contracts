@@ -16,6 +16,7 @@ describe("ProtocolCoordinator", function () {
     let messageProtocol: MockMessageProtocol;
     let messageRouter: MockMessageRouter;
     let messageProcessor: MockMessageProcessor;
+    let user: string;
 
     // Test values
     const testMessageType = ethers.encodeBytes32String("TEST_MESSAGE");
@@ -23,6 +24,14 @@ describe("ProtocolCoordinator", function () {
     const testMessageHash = ethers.keccak256(testPayload);
 
     beforeEach(async function () {
+        const signers = await ethers.getSigners();
+        // Validate that there are enough signers for testing
+        if (signers.length < 3) {
+            throw new Error("Not enough accounts available. At least 3 are required for testing.");
+        }
+
+        user = signers[2].address;
+        
         // Deploy all contracts fresh for each test
         await deployments.fixture(['ProtocolCoordinator']);
 
@@ -65,7 +74,7 @@ describe("ProtocolCoordinator", function () {
 
     describe("Message Submission", function () {
         it("Should submit message successfully", async function () {
-            const { admin, user } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             const submission = {
                 messageType: testMessageType,
                 target: user,
@@ -82,7 +91,7 @@ describe("ProtocolCoordinator", function () {
         });
 
         it("Should revert with insufficient fee", async function () {
-            const { admin, user } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             const submission = {
                 messageType: testMessageType,
                 target: user,
@@ -100,7 +109,7 @@ describe("ProtocolCoordinator", function () {
         let messageId: string;
 
         beforeEach(async function () {
-            const { admin, user } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             const submission = {
                 messageType: testMessageType,
                 target: user,
@@ -203,7 +212,7 @@ describe("ProtocolCoordinator", function () {
 
     describe("Edge Cases and Validations", function () {
         it("Should revert on oversized messages", async function () {
-            const { admin, user } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             const overSizedPayload = new Uint8Array(1024 * 1024 + 1).fill(0);
 
             const submission = {

@@ -5,12 +5,23 @@ import { ProtocolGovernance } from "../../../typechain";
 
 describe("ProtocolGovernance", function () {
     let protocolGovernance: ProtocolGovernance;
+    let governor: string, executor: string, voter: string
     const testProposalData = ethers.toUtf8Bytes("test-proposal");
 
     beforeEach(async function () {
         await deployments.fixture(['ProtocolGovernance']);
 
-        const { admin, governor, executor, voter } = await getNamedAccounts();
+        const { admin } = await getNamedAccounts();
+
+        const signers = await ethers.getSigners();
+        // Validate that there are enough signers for testing
+        if (signers.length < 4) {
+            throw new Error("Not enough accounts available. At least 3 are required for testing.");
+        }
+
+        governor = signers[2].address;
+        executor = signers[3].address;
+        voter = signers[4].address;
 
         const ProtocolGovernanceDeployment = await deployments.get('ProtocolGovernance');
         protocolGovernance = await ethers.getContractAt('ProtocolGovernance', ProtocolGovernanceDeployment.address);
@@ -35,7 +46,7 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should set initial roles correctly", async function () {
-            const { admin, governor, executor } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             const governorRole = await protocolGovernance.GOVERNOR_ROLE();
             const executorRole = await protocolGovernance.EXECUTOR_ROLE();
             const emergencyRole = await protocolGovernance.EMERGENCY_ROLE();
@@ -60,7 +71,6 @@ describe("ProtocolGovernance", function () {
 
     describe("Proposal Creation", function () {
         it("Should allow governor to create proposal", async function () {
-            const { governor } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(governor))
                 .createProposal(0, testProposalData))
                 .to.emit(protocolGovernance, "ProposalCreated")
@@ -68,22 +78,18 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should revert if non-governor tries to create proposal", async function () {
-            const { voter } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(voter))
                 .createProposal(0, testProposalData))
                 .to.be.revertedWith("ProtocolGovernance: Must have governor role");
         });
 
         it("Should revert with empty proposal data", async function () {
-            const { governor } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(governor))
                 .createProposal(0, "0x"))
                 .to.be.revertedWith("ProtocolGovernance: Empty proposal data");
         });
 
         it("Should store proposal details correctly", async function () {
-            const { governor } = await getNamedAccounts();
-            
             await expect(protocolGovernance.connect(await ethers.getSigner(governor))
                 .createProposal(0, testProposalData))
                 .to.emit(protocolGovernance, "ProposalCreated")
@@ -103,7 +109,6 @@ describe("ProtocolGovernance", function () {
         let proposalId: number;
 
         beforeEach(async function () {
-            const { governor } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(governor))
                 .createProposal(0, testProposalData))
                 .to.emit(protocolGovernance, "ProposalCreated")
@@ -113,7 +118,6 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should allow voter to vote in favor", async function () {
-            const { voter } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(voter))
                 .vote(proposalId, true))
                 .to.emit(protocolGovernance, "VoteCast")
@@ -124,7 +128,6 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should allow voter to vote against", async function () {
-            const { voter } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(voter))
                 .vote(proposalId, false))
                 .to.emit(protocolGovernance, "VoteCast")
@@ -135,14 +138,12 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should revert if voter has no voting power", async function () {
-            const { executor } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(executor))
                 .vote(proposalId, true))
                 .to.be.revertedWith("ProtocolGovernance: No voting power");
         });
 
         it("Should revert on duplicate vote", async function () {
-            const { voter } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(voter))
                 .vote(proposalId, true))
                 .to.emit(protocolGovernance, "VoteCast")
@@ -154,7 +155,6 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should revert after voting period ends", async function () {
-            const { voter } = await getNamedAccounts();
             await time.increase(7 * 24 * 60 * 60 + 1);
             await expect(protocolGovernance.connect(await ethers.getSigner(voter))
                 .vote(proposalId, true))
@@ -162,7 +162,6 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should track hasVoted correctly", async function () {
-            const { voter } = await getNamedAccounts();
             expect(await protocolGovernance.hasVoted(proposalId, voter)).to.be.false;
             
             await expect(protocolGovernance.connect(await ethers.getSigner(voter))
@@ -176,7 +175,7 @@ describe("ProtocolGovernance", function () {
 
     describe("Proposal Execution", function () {
         beforeEach(async function () {
-            const { admin, governor } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             
             await expect(protocolGovernance.connect(await ethers.getSigner(governor))
                 .createProposal(0, testProposalData))
@@ -190,7 +189,7 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should execute successful proposal", async function () {
-            const { admin, executor } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             
             await expect(protocolGovernance.connect(await ethers.getSigner(admin))
                 .vote(1, true))
@@ -206,14 +205,12 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should revert execution before voting period ends", async function () {
-            const { executor } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(executor))
                 .executeProposal(1))
                 .to.be.revertedWith("ProtocolGovernance: Voting period not ended");
         });
 
         it("Should revert execution without quorum", async function () {
-            const { executor } = await getNamedAccounts();
             await time.increase(9 * 24 * 60 * 60 + 1);
             await expect(protocolGovernance.connect(await ethers.getSigner(executor))
                 .executeProposal(1))
@@ -221,7 +218,7 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should revert execution before delay period", async function () {
-            const { admin, executor } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(admin))
                 .vote(1, true))
                 .to.emit(protocolGovernance, "VoteCast")
@@ -235,7 +232,7 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should revert duplicate execution", async function () {
-            const { admin, executor } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             
             await expect(protocolGovernance.connect(await ethers.getSigner(admin))
                 .vote(1, true))
@@ -259,7 +256,6 @@ describe("ProtocolGovernance", function () {
         const emergencyAction = ethers.toUtf8Bytes("emergency-action");
 
         it("Should allow emergency role to execute action", async function () {
-            const { executor } = await getNamedAccounts();
             const actionHash = ethers.keccak256(emergencyAction);
             
             await expect(protocolGovernance.connect(await ethers.getSigner(executor))
@@ -269,21 +265,18 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should revert if non-emergency role tries to execute", async function () {
-            const { voter } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(voter))
                 .executeEmergencyAction(emergencyAction))
                 .to.be.revertedWith("ProtocolGovernance: Must have emergency role");
         });
 
         it("Should revert with empty action data", async function () {
-            const { executor } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(executor))
                 .executeEmergencyAction("0x"))
                 .to.be.revertedWith("ProtocolGovernance: Empty action data");
         });
 
         it("Should revert duplicate emergency action", async function () {
-            const { executor } = await getNamedAccounts();
             const actionHash = ethers.keccak256(emergencyAction);
             
             await expect(protocolGovernance.connect(await ethers.getSigner(executor))
@@ -300,7 +293,7 @@ describe("ProtocolGovernance", function () {
 
     describe("Voting Power Management", function () {
         it("Should allow admin to update voting power", async function () {
-            const { admin, voter } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(admin))
                 .updateVotingPower(voter, 200))
                 .to.emit(protocolGovernance, "VotingPowerUpdated")
@@ -310,7 +303,6 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should revert if non-admin tries to update voting power", async function () {
-            const { voter } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(voter))
                 .updateVotingPower(voter, 200))
                 .to.be.revertedWith("ProtocolGovernance: Must have admin role");
@@ -319,7 +311,6 @@ describe("ProtocolGovernance", function () {
 
     describe("Pause/Unpause", function () {
         it("Should allow emergency role to pause", async function () {
-            const { executor } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(executor))
                 .pause())
                 .to.emit(protocolGovernance, "Paused")
@@ -327,7 +318,6 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should allow emergency role to unpause", async function () {
-            const { executor } = await getNamedAccounts();
             await protocolGovernance.connect(await ethers.getSigner(executor)).pause();
             await expect(protocolGovernance.connect(await ethers.getSigner(executor))
                 .unpause())
@@ -336,14 +326,12 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should revert if non-emergency role tries to pause", async function () {
-            const { voter } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(voter))
                 .pause())
                 .to.be.revertedWith("ProtocolGovernance: Must have emergency role");
         });
 
         it("Should prevent proposal creation when paused", async function () {
-            const { executor, governor } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(executor))
                 .pause())
                 .to.emit(protocolGovernance, "Paused")
@@ -355,7 +343,6 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should prevent voting when paused", async function () {
-            const { executor, governor, voter } = await getNamedAccounts();
             
             await expect(protocolGovernance.connect(await ethers.getSigner(governor))
                 .createProposal(0, testProposalData))
@@ -373,7 +360,6 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should prevent proposal execution when paused", async function () {
-            const { executor, governor, voter } = await getNamedAccounts();
             
             await expect(protocolGovernance.connect(await ethers.getSigner(governor))
                 .createProposal(0, testProposalData))
@@ -400,7 +386,6 @@ describe("ProtocolGovernance", function () {
 
     describe("Quorum Calculations", function () {
         beforeEach(async function () {
-            const { governor } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(governor))
                 .createProposal(0, testProposalData))
                 .to.emit(protocolGovernance, "ProposalCreated")
@@ -479,7 +464,7 @@ describe("ProtocolGovernance", function () {
 
     describe("Edge Cases", function () {
         it("Should handle proposal with maximum votes", async function () {
-            const { admin, governor } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             const voter = await ethers.getSigner(admin);
             
             const maxVotingPower = ethers.MaxUint256;
@@ -500,7 +485,6 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should handle concurrent proposal creation", async function () {
-            const { governor } = await getNamedAccounts();
             const governorSigner = await ethers.getSigner(governor);
             
             await expect(protocolGovernance.connect(governorSigner)
@@ -520,7 +504,7 @@ describe("ProtocolGovernance", function () {
         });
 
         it("Should handle zero voting power updates", async function () {
-            const { admin, voter } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             await expect(protocolGovernance.connect(await ethers.getSigner(admin))
                 .updateVotingPower(voter, 0))
                 .to.emit(protocolGovernance, "VotingPowerUpdated")

@@ -15,6 +15,8 @@ describe("SettlementController", function () {
     let mockToken: MockERC20Token;
     let mockLiquidityPool: MockLiquidityPool;
 
+    let user: string;
+
     // Constants for testing
     const testAmount = 1000n * 10n ** 18n;  // 1000 tokens
     const testMessageId = ethers.id("TEST_MESSAGE");
@@ -23,6 +25,13 @@ describe("SettlementController", function () {
         await deployments.fixture(['tokens', 'core', 'SettlementController']);
 
         const { admin } = await getNamedAccounts();
+        const signers = await ethers.getSigners();
+        // Validate that there are enough signers for testing
+        if (signers.length < 3) {
+            throw new Error("Not enough accounts available. At least 3 are required for testing.");
+        }
+
+        user = signers[2].address;
 
         // Get deployed contract instances
         const settlementControllerDeployment = await deployments.get('SettlementController');
@@ -56,7 +65,7 @@ describe("SettlementController", function () {
         let settlementId: string;
 
         beforeEach(async function () {
-            const { admin, user } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             const tx = await settlementController.connect(await ethers.getSigner(admin))
                 .processSettlement(
                     testMessageId,
@@ -73,7 +82,7 @@ describe("SettlementController", function () {
         });
 
         it("Should process settlement successfully", async function () {
-            const { admin, user } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             const newMessageId = ethers.id("NEW_MESSAGE");
 
             const tx = await settlementController.connect(await ethers.getSigner(admin))
@@ -95,7 +104,6 @@ describe("SettlementController", function () {
         });
 
         it("Should store correct settlement details", async function () {
-            const { user } = await getNamedAccounts();
             const settlement = await settlementController.getSettlement(settlementId);
             expect(settlement.messageId).to.equal(testMessageId);
             expect(settlement.token).to.equal(await mockToken.getAddress());
@@ -105,7 +113,7 @@ describe("SettlementController", function () {
         });
 
         it("Should prevent duplicate settlement processing", async function () {
-            const { admin, user } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             
             // Try to process the same settlement again
             await expect(settlementController.connect(await ethers.getSigner(admin))
@@ -123,7 +131,7 @@ describe("SettlementController", function () {
         let settlementId: string;
 
         beforeEach(async function () {
-            const { admin, user } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             const tx = await settlementController.connect(await ethers.getSigner(admin))
                 .processSettlement(
                     testMessageId,
@@ -154,7 +162,6 @@ describe("SettlementController", function () {
 
     describe("Access Control", function () {
         it("Should only allow handlers to process settlements", async function () {
-            const { user } = await getNamedAccounts();
             await expect(settlementController.connect(await ethers.getSigner(user))
                 .processSettlement(
                     testMessageId,
@@ -173,7 +180,7 @@ describe("SettlementController", function () {
         });
 
         it("Should prevent operations when paused", async function () {
-            const { admin, user } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             await settlementController.connect(await ethers.getSigner(admin)).pause();
             
             await expect(settlementController.connect(await ethers.getSigner(admin))

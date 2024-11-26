@@ -4,6 +4,7 @@ import { LOG_DEPLOYMENTS } from "../../src/";
 import { isTestnetMarket, loadProtocolConfig } from "../../src/market-config-helpers";
 import { COMMON_DEPLOY_PARAMS, MARKET_NAME } from "./../../src/env";
 import { network } from "hardhat";
+import { isUnitMode } from "../../src/utils/deploy-helper";
 
 const func: DeployFunction = async function ({
     getNamedAccounts,
@@ -13,12 +14,12 @@ const func: DeployFunction = async function ({
     const { deploy } = deployments;
     const { admin } = await getNamedAccounts();
 
-    const defaultAdmin = admin; // or any other address you want to set as default admin
-    const pauser = admin; // or any other address you want to set as pauser
-    const minter = admin; // or any other address you want to set as minter
-    const upgrader = admin; // or any other address you want to set as upgrader
+    const defaultAdmin = admin; 
+    const pauser = admin;
+    const minter = admin;
+    const upgrader = admin;
 
-    if (!network.live) {
+    if (isUnitMode()) {
         await deploy("MockERC20Token", {
             from: admin,
             contract: "MockERC20Token",

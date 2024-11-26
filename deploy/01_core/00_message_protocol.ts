@@ -3,6 +3,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { isTestnetMarket, loadProtocolConfig } from "../../src/market-config-helpers";
 import { COMMON_DEPLOY_PARAMS, MARKET_NAME } from "../../src/env";
 import { network } from "hardhat";
+import { isUnitMode } from "../../src/utils/deploy-helper";
 
 const func: DeployFunction = async function ({
     getNamedAccounts,
@@ -10,9 +11,9 @@ const func: DeployFunction = async function ({
     ...hre
 }: HardhatRuntimeEnvironment) {
     const { deploy } = deployments;
-    const { deployer, admin } = await getNamedAccounts();
+    const { admin } = await getNamedAccounts();
 
-    if (!network.live) {
+    if (isUnitMode()) {
         await deploy("MockMessageProtocol", { from: admin, args: [], ...COMMON_DEPLOY_PARAMS });
     }
 

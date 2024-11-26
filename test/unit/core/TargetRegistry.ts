@@ -4,11 +4,22 @@ import { TargetRegistry } from "../../../typechain";
 
 describe("TargetRegistry", function () {
     let targetRegistry: TargetRegistry;
+    let registrar: string, validator: string, user: string;
     const testMetadata = ethers.toUtf8Bytes("test-metadata");
 
     beforeEach(async function () {
         await deployments.fixture(['TargetRegistry']);
-        const { admin, registrar, validator } = await getNamedAccounts();
+        const { admin } = await getNamedAccounts();
+        const signers = await ethers.getSigners();
+        // Validate that there are enough signers for testing
+        if (signers.length < 4) {
+            throw new Error("Not enough accounts available. At least 3 are required for testing.");
+        }
+
+        registrar = signers[2].address;
+        validator = signers[3].address;
+        user = signers[4].address;
+
 
         const TargetRegistryDeployment = await deployments.get('TargetRegistry');
         targetRegistry = await ethers.getContractAt('TargetRegistry', TargetRegistryDeployment.address);
@@ -28,13 +39,11 @@ describe("TargetRegistry", function () {
         });
 
         it("Should set initial roles correctly", async function () {
-            const { registrar, validator } = await getNamedAccounts();
             expect(await targetRegistry.hasRole(await targetRegistry.REGISTRAR_ROLE(), registrar)).to.be.true;
             expect(await targetRegistry.hasRole(await targetRegistry.VALIDATOR_ROLE(), validator)).to.be.true;
         });
 
         it("Should not set any roles for non-authorized users", async function () {
-            const { user } = await getNamedAccounts();
             expect(await targetRegistry.hasRole(await targetRegistry.REGISTRAR_ROLE(), user)).to.be.false;
             expect(await targetRegistry.hasRole(await targetRegistry.VALIDATOR_ROLE(), user)).to.be.false;
         });
@@ -42,7 +51,6 @@ describe("TargetRegistry", function () {
 
     describe("Target Registration", function () {
         it("Should allow registrar to register target", async function () {
-            const { registrar, user } = await getNamedAccounts();
             await expect(targetRegistry.connect(await ethers.getSigner(registrar))
                 .registerTarget(user, 1, 0, testMetadata))
                 .to.emit(targetRegistry, "TargetRegistered")
@@ -50,7 +58,6 @@ describe("TargetRegistry", function () {
         });
 
         it("Should store correct target data", async function () {
-            const { registrar, user } = await getNamedAccounts();
             await targetRegistry.connect(await ethers.getSigner(registrar))
                 .registerTarget(user, 1, 0, testMetadata);
 
@@ -63,21 +70,18 @@ describe("TargetRegistry", function () {
         });
 
         it("Should revert if non-registrar tries to register", async function () {
-            const { user } = await getNamedAccounts();
             await expect(targetRegistry.connect(await ethers.getSigner(user))
                 .registerTarget(user, 1, 0, testMetadata))
                 .to.be.revertedWith("TargetRegistry: Must have registrar role");
         });
 
         it("Should revert with zero address", async function () {
-            const { registrar } = await getNamedAccounts();
             await expect(targetRegistry.connect(await ethers.getSigner(registrar))
                 .registerTarget(ethers.ZeroAddress, 1, 0, testMetadata))
                 .to.be.revertedWith("TargetRegistry: Invalid address");
         });
 
         it("Should revert for duplicate registration", async function () {
-            const { registrar, user } = await getNamedAccounts();
             const registrarSigner = await ethers.getSigner(registrar);
             
             await targetRegistry.connect(registrarSigner)
@@ -89,7 +93,6 @@ describe("TargetRegistry", function () {
         });
 
         it("Should register targets of different types", async function () {
-            const { registrar } = await getNamedAccounts();
             const [target1, target2, target3] = await ethers.getSigners();
             const registrarSigner = await ethers.getSigner(registrar);
 
@@ -117,13 +120,11 @@ describe("TargetRegistry", function () {
 
     describe("Target Status Management", function () {
         beforeEach(async function () {
-            const { registrar, user } = await getNamedAccounts();
             await targetRegistry.connect(await ethers.getSigner(registrar))
                 .registerTarget(user, 1, 0, testMetadata);
         });
 
         it("Should allow registrar to update status", async function () {
-            const { registrar, user } = await getNamedAccounts();
             await expect(targetRegistry.connect(await ethers.getSigner(registrar))
                 .updateTargetStatus(user, false))
                 .to.emit(targetRegistry, "TargetStatusUpdated")
@@ -131,7 +132,6 @@ describe("TargetRegistry", function () {
         });
 
         it("Should reflect status changes in validity check", async function () {
-            const { registrar, user } = await getNamedAccounts();
             const registrarSigner = await ethers.getSigner(registrar);
 
             // Initially valid
@@ -149,7 +149,6 @@ describe("TargetRegistry", function () {
         });
 
         it("Should revert status update for non-registered target", async function () {
-            const { registrar } = await getNamedAccounts();
             await expect(targetRegistry.connect(await ethers.getSigner(registrar))
                 .updateTargetStatus(ethers.Wallet.createRandom().address, false))
                 .to.be.revertedWith("TargetRegistry: Target not registered");
@@ -160,14 +159,12 @@ describe("TargetRegistry", function () {
         let targetAddress: string;
 
         beforeEach(async function () {
-            const { registrar } = await getNamedAccounts();
             targetAddress = (await ethers.getSigners())[1].address;
             await targetRegistry.connect(await ethers.getSigner(registrar))
                 .registerTarget(targetAddress, 1, 0, testMetadata);
         });
 
         it("Should allow registrar to update metadata", async function () {
-            const { registrar } = await getNamedAccounts();
             const newMetadata = ethers.toUtf8Bytes("new-metadata");
             
             await expect(targetRegistry.connect(await ethers.getSigner(registrar))
@@ -180,7 +177,6 @@ describe("TargetRegistry", function () {
         });
 
         it("Should revert metadata update for non-registered target", async function () {
-            const { registrar } = await getNamedAccounts();
             await expect(targetRegistry.connect(await ethers.getSigner(registrar))
                 .updateTargetMetadata(ethers.Wallet.createRandom().address, testMetadata))
                 .to.be.revertedWith("TargetRegistry: Target not registered");
@@ -191,7 +187,6 @@ describe("TargetRegistry", function () {
         const testEmitter = ethers.randomBytes(32);
 
         it("Should allow registrar to register emitter", async function () {
-            const { registrar } = await getNamedAccounts();
             await expect(targetRegistry.connect(await ethers.getSigner(registrar))
                 .registerEmitter(testEmitter, 1))
                 .to.emit(targetRegistry, "EmitterRegistered")
@@ -199,7 +194,6 @@ describe("TargetRegistry", function () {
         });
 
         it("Should validate registered emitter", async function () {
-            const { registrar } = await getNamedAccounts();
             await targetRegistry.connect(await ethers.getSigner(registrar))
                 .registerEmitter(testEmitter, 1);
 
@@ -207,7 +201,6 @@ describe("TargetRegistry", function () {
         });
 
         it("Should allow registrar to deregister emitter", async function () {
-            const { registrar } = await getNamedAccounts();
             await targetRegistry.connect(await ethers.getSigner(registrar))
                 .registerEmitter(testEmitter, 1);
 
@@ -220,7 +213,6 @@ describe("TargetRegistry", function () {
         });
 
         it("Should revert registration of zero emitter address", async function () {
-            const { registrar } = await getNamedAccounts();
             await expect(targetRegistry.connect(await ethers.getSigner(registrar))
                 .registerEmitter(ethers.ZeroHash, 1))
                 .to.be.revertedWith("TargetRegistry: Invalid emitter");
@@ -232,7 +224,6 @@ describe("TargetRegistry", function () {
         let targets: string[];
 
         beforeEach(async function () {
-            const { registrar } = await getNamedAccounts();
             const registrarSigner = await ethers.getSigner(registrar);
             targets = (await ethers.getSigners()).slice(0, 3).map(signer => signer.address);
 
@@ -283,7 +274,7 @@ describe("TargetRegistry", function () {
         });
 
         it("Should prevent operations when paused", async function () {
-            const { admin, registrar, user } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             await targetRegistry.connect(await ethers.getSigner(admin)).pause();
             
             await expect(targetRegistry.connect(await ethers.getSigner(registrar))
@@ -292,7 +283,7 @@ describe("TargetRegistry", function () {
         });
 
         it("Should allow admin to unpause", async function () {
-            const { admin, registrar, user } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             const adminSigner = await ethers.getSigner(admin);
             const registrarSigner = await ethers.getSigner(registrar);
 
@@ -310,7 +301,6 @@ describe("TargetRegistry", function () {
         });
 
         it("Should revert pause/unpause from non-admin", async function () {
-            const { registrar } = await getNamedAccounts();
             await expect(targetRegistry.connect(await ethers.getSigner(registrar))
                 .pause())
                 .to.be.revertedWith("TargetRegistry: Must have admin role");
@@ -323,7 +313,6 @@ describe("TargetRegistry", function () {
 
     describe("Edge Cases", function () {
         it("Should handle concurrent target registrations", async function () {
-            const { registrar } = await getNamedAccounts();
             const registrarSigner = await ethers.getSigner(registrar);
             const targets = (await ethers.getSigners()).slice(0, 5);
 
@@ -338,7 +327,6 @@ describe("TargetRegistry", function () {
         });
 
         it("Should handle registration across multiple chains", async function () {
-            const { registrar } = await getNamedAccounts();
             const registrarSigner = await ethers.getSigner(registrar);
             const target = (await ethers.getSigners())[1];
             
@@ -357,7 +345,6 @@ describe("TargetRegistry", function () {
         });
 
         it("Should handle large metadata", async function () {
-            const { registrar } = await getNamedAccounts();
             const largeMetadata = ethers.toUtf8Bytes("x".repeat(1000)); // 1KB metadata
             const target = (await ethers.getSigners())[1];
 
@@ -370,7 +357,6 @@ describe("TargetRegistry", function () {
         });
 
         it("Should handle multiple status updates", async function () {
-            const { registrar } = await getNamedAccounts();
             const registrarSigner = await ethers.getSigner(registrar);
             const target = (await ethers.getSigners())[1];
 
@@ -388,7 +374,6 @@ describe("TargetRegistry", function () {
         });
 
         it("Should handle multiple metadata updates", async function () {
-            const { registrar } = await getNamedAccounts();
             const registrarSigner = await ethers.getSigner(registrar);
             const target = (await ethers.getSigners())[1];
 
@@ -407,7 +392,6 @@ describe("TargetRegistry", function () {
         });
 
         it("Should handle empty metadata", async function () {
-            const { registrar,  } = await getNamedAccounts();
             const target = (await ethers.getSigners())[1];
             
             await expect(targetRegistry.connect(await ethers.getSigner(registrar))
@@ -416,7 +400,6 @@ describe("TargetRegistry", function () {
         });
 
         it("Should handle all target types for same address", async function () {
-            const { registrar } = await getNamedAccounts();
             const registrarSigner = await ethers.getSigner(registrar);
             const target = (await ethers.getSigners())[1];
 
@@ -445,7 +428,7 @@ describe("TargetRegistry", function () {
 
     describe("Access Control", function () {
         it("Should allow admin to grant and revoke roles", async function () {
-            const { admin, user } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             const newRegistrar = (await ethers.getSigners())[1];
             const registrarRole = await targetRegistry.REGISTRAR_ROLE();
 
@@ -469,7 +452,6 @@ describe("TargetRegistry", function () {
         });
 
         it("Should prevent non-admin from managing roles", async function () {
-            const { registrar } = await getNamedAccounts();
             const newRegistrar = (await ethers.getSigners())[1];
             const registrarRole = await targetRegistry.REGISTRAR_ROLE();
 
@@ -479,7 +461,6 @@ describe("TargetRegistry", function () {
         });
 
         it("Should allow role holders to renounce their roles", async function () {
-            const { registrar } = await getNamedAccounts();
             const registrarSigner = await ethers.getSigner(registrar);
             const registrarRole = await targetRegistry.REGISTRAR_ROLE();
 
@@ -494,7 +475,6 @@ describe("TargetRegistry", function () {
 
     describe("Integration Tests", function () {
         it("Should maintain correct indices after multiple operations", async function () {
-            const { registrar } = await getNamedAccounts();
             const registrarSigner = await ethers.getSigner(registrar);
             const [target1, target2, target3] = await ethers.getSigners();
 
@@ -534,7 +514,7 @@ describe("TargetRegistry", function () {
         });
 
         it("Should handle complete lifecycle of a target", async function () {
-            const { registrar, admin } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             const registrarSigner = await ethers.getSigner(registrar);
             const target = (await ethers.getSigners())[1];
 

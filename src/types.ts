@@ -82,17 +82,11 @@ export interface IBaseConfiguration {
     ReserveAssets?: iParamsPerNetwork<SymbolMap<tEthereumAddress>>;
     WormHoleCoreContracts?: iParamsPerNetwork<tEthereumAddress>;
     WormHoleRelayContracts?: iParamsPerNetwork<tEthereumAddress>;
-    // FallbackOracle?: iParamsPerNetwork<tEthereumAddress>;
-    // ChainlinkAggregator: iParamsPerNetwork<ITokenAddress>;
-    // WrappedTokenGateway?: iParamsPerNetwork<tEthereumAddress>;
-    // StableDebtTokenImplementation?: iParamsPerNetwork<tEthereumAddress>;
-    // WormHoleContracts?: iParamsPerNetwork<SymbolMap<tEthereumAddress>>;
 }
 
 export interface ICommonConfiguration extends IBaseConfiguration {}
 
 export interface IGFSConfiguration extends ICommonConfiguration {
-  //ReservesConfig: iAavePoolAssets<IReserveParams>;
 }
 
 export type ProtocolConfiguration = ICommonConfiguration;

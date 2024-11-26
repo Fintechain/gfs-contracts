@@ -4,6 +4,7 @@ import { MessageRouter } from "../../typechain";
 import { COMMON_DEPLOY_PARAMS, MARKET_NAME } from "../../src/env";
 import { isTestnetMarket, loadProtocolConfig } from "../../src/market-config-helpers";
 import { network } from "hardhat";
+import { getDeploymentMode, isUnitMode } from "../../src/utils/deploy-helper";
 
 // Goerli testnet addresses - we'll use these for local hardhat node
 const WORMHOLE_ADDRESSES = {
@@ -18,6 +19,7 @@ const func: DeployFunction = async function ({
 }: HardhatRuntimeEnvironment) {
     const { deploy, get } = deployments;
     const { admin } = await getNamedAccounts();
+    const adminSigner = await hre.ethers.getSigner(admin);
 
     // Get dependency addresses
     var wormhole;
@@ -25,14 +27,14 @@ const func: DeployFunction = async function ({
     var targetRegistry;
     var messageProcessor;
 
-    if (!network.live) {
+    if (isUnitMode()) {
 
         await deploy("MockMessageRouter", { from: admin, args: [], ...COMMON_DEPLOY_PARAMS });
 
         wormhole = (await get("MockWormhole")).address;
-        wormholeRelayer =( (await get("MockWormholeRelayer")).address);
-       /*  wormhole = WORMHOLE_ADDRESSES.wormhole
-        wormholeRelayer = WORMHOLE_ADDRESSES.wormholeRelayer; */
+        wormholeRelayer = ((await get("MockWormholeRelayer")).address);
+        /*  wormhole = WORMHOLE_ADDRESSES.wormhole
+         wormholeRelayer = WORMHOLE_ADDRESSES.wormholeRelayer; */
 
         targetRegistry = await get("MockTargetRegistry");
         messageProcessor = await get("MockMessageProcessor");
@@ -54,8 +56,29 @@ const func: DeployFunction = async function ({
             targetRegistry.address,
             messageProcessor.address
         ],
-        ...COMMON_DEPLOY_PARAMS 
+        ...COMMON_DEPLOY_PARAMS
     });
+
+    if (!isUnitMode()) {
+        // 1. Grant MessageProcessor's PROCESSOR_ROLE to the MessageRouter contract
+        const messageProcessorContract = await hre.ethers.getContractAt("MessageProcessor", messageProcessor.address);
+        await messageProcessorContract.connect(
+            adminSigner).grantRole(await messageProcessorContract.PROCESSOR_ROLE(), deployment.address);
+
+
+        // 2. Grant TargetRegistry's VALIDATOR_ROLE to the MessageRouter contract
+        const targetRegistryContract = await hre.ethers.getContractAt("TargetRegistry", targetRegistry.address);
+        await targetRegistryContract.connect(
+            adminSigner).grantRole(await targetRegistryContract.VALIDATOR_ROLE(), deployment.address);
+
+        console.log("MessageRouter has PROCESSOR_ROLE in MessageProcessor:",
+            await messageProcessorContract.hasRole(await messageProcessorContract.PROCESSOR_ROLE(), deployment.address)
+        );
+
+        console.log("MessageRouter has VALIDATOR_ROLE in TargetRegistry:",
+            await targetRegistryContract.hasRole(await targetRegistryContract.VALIDATOR_ROLE(), deployment.address)
+        );
+    }
 
     // Log deployment information
     console.log("\n=== MessageRouter Deployment Information ===");
@@ -68,6 +91,15 @@ const func: DeployFunction = async function ({
     console.log("- MessageProcessor:", messageProcessor.address);
     console.log("\nDeployer:", admin);
     console.log("=======================================\n");
+
+    if (!isUnitMode()) {
+        // 1. Grant MessageProcessor's PROCESSOR_ROLE to the MessageRouter contract
+        const messageProcessorContract = await hre.ethers.getContractAt("MessageProcessor", messageProcessor.address);
+
+
+
+
+    }
 
     return true;
 };

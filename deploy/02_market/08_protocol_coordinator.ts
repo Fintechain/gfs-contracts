@@ -2,8 +2,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { ProtocolCoordinator } from "../../typechain";
 import { COMMON_DEPLOY_PARAMS, MARKET_NAME } from "../../src/env";
-import { isTestnetMarket, loadProtocolConfig } from "../../src/market-config-helpers";
-import { network } from "hardhat";
+import { isUnitMode } from "../../src/utils/deploy-helper";
 
 const func: DeployFunction = async function ({
     getNamedAccounts,
@@ -12,6 +11,7 @@ const func: DeployFunction = async function ({
 }: HardhatRuntimeEnvironment) {
     const { deploy, get } = deployments;
     const { admin } = await getNamedAccounts();
+    const adminSigner = await hre.ethers.getSigner(admin);
 
     var messageRouter;
     var messageRegistry;
@@ -19,7 +19,7 @@ const func: DeployFunction = async function ({
     var messageProcessor;
 
     // For integration tests, always use real contracts
-    if (!network.live) {
+    if (isUnitMode()) {
         messageRouter = (await get("MockMessageRouter")).address;
         messageRegistry = (await get("MockMessageRegistry")).address;
         messageProtocol = (await get("MockMessageProtocol")).address;
@@ -52,12 +52,11 @@ const func: DeployFunction = async function ({
     )) as ProtocolCoordinator;
 
     // Set up roles if this is a fresh deployment
-    if (network.live) {
+    if (!isUnitMode()) {
         const protocolCoordinator = await hre.ethers.getContractAt(
             "ProtocolCoordinator",
             deployment.address
         );
-        const adminSigner = await hre.ethers.getSigner(admin);
 
         // 1. Grant MessageProtocol's VALIDATOR_ROLE to the ProtocolCoordinator contract
         const messageProtocolContract = await hre.ethers.getContractAt("MessageProtocol", messageProtocol);
@@ -94,32 +93,8 @@ const func: DeployFunction = async function ({
             admin
         );
 
-
-        // Grant VALIDATOR_ROLE to MessageRouter in TargetRegistry
-        const targetRegistry = await hre.ethers.getContractAt(
-            "TargetRegistry",
-            (await get("TargetRegistry")).address
-        );
-
-        const validatorRole = await targetRegistry.VALIDATOR_ROLE();
-        const hasValidatorRole = await targetRegistry.hasRole(validatorRole, messageRouter);
-
-        if (!hasValidatorRole) {
-            console.log("Granting VALIDATOR_ROLE to MessageRouter in TargetRegistry...");
-            await targetRegistry.connect(adminSigner).grantRole(validatorRole, messageRouter);
-        }
-
-        // Verify the role was granted
-        console.log("\n=== Role Grant Verification ===");
-        console.log("MessageRouter has VALIDATOR_ROLE in TargetRegistry:",
-            await targetRegistry.hasRole(validatorRole, messageRouter)
-        );
         console.log("================================\n");
     }
-
-
-
-
 
     // Get role identifiers
     const defaultAdminRole = await protocolCoordinator.DEFAULT_ADMIN_ROLE();

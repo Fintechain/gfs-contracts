@@ -16,11 +16,21 @@ describe("MessageRegistry", function () {
     const testMessageType = ethers.encodeBytes32String("TEST_MESSAGE");
     const testMessageHash = ethers.keccak256(ethers.toUtf8Bytes("test-message"));
     const testPayload = ethers.toUtf8Bytes("test-payload");
+    let registrar: string, processor: string, user: string;
 
     beforeEach(async function () {
         await deployments.fixture(['MessageRegistry']);
 
-        const { admin, registrar, processor } = await getNamedAccounts();
+        const { admin } = await getNamedAccounts();
+        const signers = await ethers.getSigners();
+        // Validate that there are enough signers for testing
+        if (signers.length < 4) {
+            throw new Error("Not enough accounts available. At least 3 are required for testing.");
+        }
+
+        registrar = signers[2].address;
+        processor = signers[3].address;
+        user = signers[4].address;
 
         const MessageRegistryDeployment = await deployments.get('MessageRegistry');
         messageRegistry = await ethers.getContractAt('MessageRegistry', MessageRegistryDeployment.address);
@@ -39,7 +49,6 @@ describe("MessageRegistry", function () {
         });
 
         it("Should set initial roles correctly", async function () {
-            const { registrar, processor } = await getNamedAccounts();
             expect(await messageRegistry.hasRole(await messageRegistry.REGISTRAR_ROLE(), registrar)).to.be.true;
             expect(await messageRegistry.hasRole(await messageRegistry.PROCESSOR_ROLE(), processor)).to.be.true;
         });
@@ -47,7 +56,6 @@ describe("MessageRegistry", function () {
 
     describe("Message Registration", function () {
         it("Should allow registrar to register message", async function () {
-            const { registrar, user } = await getNamedAccounts();
             const registrarSigner = await ethers.getSigner(registrar);
             
             const expectedMessageId = await messageRegistry.generateMessageId(
@@ -65,7 +73,6 @@ describe("MessageRegistry", function () {
         });
 
         it("Should store correct message data", async function () {
-            const { registrar, user } = await getNamedAccounts();
             const registrarSigner = await ethers.getSigner(registrar);
             
             const expectedMessageId = await messageRegistry.generateMessageId(
@@ -89,21 +96,18 @@ describe("MessageRegistry", function () {
         });
 
         it("Should revert if non-registrar tries to register", async function () {
-            const { user } = await getNamedAccounts();
             await expect(messageRegistry.connect(await ethers.getSigner(user))
                 .registerMessage(testMessageType, testMessageHash, user, 1, testPayload))
                 .to.be.revertedWith("MessageRegistry: Must have registrar role");
         });
 
         it("Should revert with zero address target", async function () {
-            const { registrar } = await getNamedAccounts();
             await expect(messageRegistry.connect(await ethers.getSigner(registrar))
                 .registerMessage(testMessageType, testMessageHash, ethers.ZeroAddress, 1, testPayload))
                 .to.be.revertedWith("MessageRegistry: Invalid target address");
         });
 
         it("Should revert with empty payload", async function () {
-            const { registrar, user } = await getNamedAccounts();
             await expect(messageRegistry.connect(await ethers.getSigner(registrar))
                 .registerMessage(testMessageType, testMessageHash, user, 1, "0x"))
                 .to.be.revertedWith("MessageRegistry: Empty payload");
@@ -114,7 +118,6 @@ describe("MessageRegistry", function () {
         let messageId: string;
 
         beforeEach(async function () {
-            const { registrar, user } = await getNamedAccounts();
             const registrarSigner = await ethers.getSigner(registrar);
             
             messageId = await messageRegistry.generateMessageId(
@@ -132,7 +135,6 @@ describe("MessageRegistry", function () {
         });
 
         it("Should allow processor to update status", async function () {
-            const { processor } = await getNamedAccounts();
             await expect(messageRegistry.connect(await ethers.getSigner(processor))
                 .updateMessageStatus(messageId, MessageStatus.DELIVERED))
                 .to.emit(messageRegistry, "MessageStatusUpdated")
@@ -140,7 +142,6 @@ describe("MessageRegistry", function () {
         });
 
         it("Should follow valid status transitions", async function () {
-            const { processor } = await getNamedAccounts();
             const processorSigner = await ethers.getSigner(processor);
 
             await messageRegistry.connect(processorSigner).updateMessageStatus(messageId, MessageStatus.DELIVERED);
@@ -152,7 +153,6 @@ describe("MessageRegistry", function () {
         });
 
         it("Should revert invalid status transitions", async function () {
-            const { processor } = await getNamedAccounts();
             await expect(messageRegistry.connect(await ethers.getSigner(processor))
                 .updateMessageStatus(messageId, MessageStatus.SETTLED))
                 .to.be.revertedWith("MessageRegistry: Invalid status transition");
@@ -164,7 +164,6 @@ describe("MessageRegistry", function () {
         let secondMessageId: string;
 
         beforeEach(async function () {
-            const { registrar, user } = await getNamedAccounts();
             const registrarSigner = await ethers.getSigner(registrar);
 
             messageId = await messageRegistry.generateMessageId(
@@ -196,7 +195,6 @@ describe("MessageRegistry", function () {
         });
 
         it("Should return correct sender messages", async function () {
-            const { registrar } = await getNamedAccounts();
             const senderMessages = await messageRegistry.getMessagesBySender(registrar);
             expect(senderMessages).to.have.lengthOf(2);
             expect(senderMessages).to.include(messageId);
@@ -204,7 +202,6 @@ describe("MessageRegistry", function () {
         });
 
         it("Should return correct target messages", async function () {
-            const { user } = await getNamedAccounts();
             const targetMessages = await messageRegistry.getMessagesByTarget(user);
             expect(targetMessages).to.have.lengthOf(2);
             expect(targetMessages).to.include(messageId);
@@ -221,7 +218,6 @@ describe("MessageRegistry", function () {
         });
 
         it("Should return correct message details", async function () {
-            const { registrar, user } = await getNamedAccounts();
             const message = await messageRegistry.getMessage(messageId);
 
             expect(message.messageType).to.equal(testMessageType);
@@ -238,7 +234,6 @@ describe("MessageRegistry", function () {
         let messageId: string;
 
         beforeEach(async function () {
-            const { registrar, user } = await getNamedAccounts();
             const registrarSigner = await ethers.getSigner(registrar);
             
             messageId = await messageRegistry.generateMessageId(
@@ -256,7 +251,7 @@ describe("MessageRegistry", function () {
         });
 
         it("Should allow admin to clear sender message index", async function () {
-            const { admin, registrar } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
 
             await expect(messageRegistry.connect(await ethers.getSigner(admin))
                 .clearMessageIndex(registrar, true))
@@ -268,7 +263,7 @@ describe("MessageRegistry", function () {
         });
 
         it("Should allow admin to clear target message index", async function () {
-            const { admin, user } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
 
             await expect(messageRegistry.connect(await ethers.getSigner(admin))
                 .clearMessageIndex(user, false))
@@ -280,7 +275,7 @@ describe("MessageRegistry", function () {
         });
 
         it("Should allow admin to pause and unpause", async function () {
-            const { admin, registrar, user } = await getNamedAccounts();
+            const { admin } = await getNamedAccounts();
             const adminSigner = await ethers.getSigner(admin);
             const registrarSigner = await ethers.getSigner(registrar);
         
@@ -319,7 +314,6 @@ describe("MessageRegistry", function () {
         });
 
         it("Should revert admin functions for non-admin", async function () {
-            const { user } = await getNamedAccounts();
             const userSigner = await ethers.getSigner(user);
 
             await expect(messageRegistry.connect(userSigner).pause())
@@ -335,7 +329,6 @@ describe("MessageRegistry", function () {
 
     describe("Message ID Generation", function () {
         it("Should generate consistent message IDs", async function () {
-            const { registrar, user } = await getNamedAccounts();
             const messageId = await messageRegistry.generateMessageId(
                 testMessageType,
                 testMessageHash,
@@ -368,7 +361,6 @@ describe("MessageRegistry", function () {
         let messageId: string;
 
         beforeEach(async function () {
-            const { registrar, user } = await getNamedAccounts();
             const registrarSigner = await ethers.getSigner(registrar);
             
             messageId = await messageRegistry.generateMessageId(
@@ -386,7 +378,6 @@ describe("MessageRegistry", function () {
         });
 
         it("Should track processed status correctly", async function () {
-            const { processor } = await getNamedAccounts();
             const processorSigner = await ethers.getSigner(processor);
 
             expect(await messageRegistry.isMessageProcessed(messageId)).to.be.false;
@@ -400,7 +391,6 @@ describe("MessageRegistry", function () {
         });
 
         it("Should track settled status correctly", async function () {
-            const { processor } = await getNamedAccounts();
             const processorSigner = await ethers.getSigner(processor);
 
             await messageRegistry.connect(processorSigner)
@@ -414,7 +404,6 @@ describe("MessageRegistry", function () {
             });
     
             it("Should maintain processed status after failure", async function () {
-                const { processor } = await getNamedAccounts();
                 const processorSigner = await ethers.getSigner(processor);
     
                 await messageRegistry.connect(processorSigner)
@@ -434,7 +423,6 @@ describe("MessageRegistry", function () {
             let messageId: string;
     
             beforeEach(async function () {
-                const { registrar, user } = await getNamedAccounts();
                 const registrarSigner = await ethers.getSigner(registrar);
                 
                 messageId = await messageRegistry.generateMessageId(
@@ -452,7 +440,6 @@ describe("MessageRegistry", function () {
             });
     
             it("Should allow all valid status transitions", async function () {
-                const { processor } = await getNamedAccounts();
                 const processorSigner = await ethers.getSigner(processor);
     
                 await expect(messageRegistry.connect(processorSigner)
@@ -472,7 +459,6 @@ describe("MessageRegistry", function () {
             });
     
             it("Should allow transition to FAILED from PENDING", async function () {
-                const { processor } = await getNamedAccounts();
                 await expect(messageRegistry.connect(await ethers.getSigner(processor))
                     .updateMessageStatus(messageId, MessageStatus.FAILED))
                     .to.emit(messageRegistry, "MessageStatusUpdated")
@@ -480,7 +466,6 @@ describe("MessageRegistry", function () {
             });
     
             it("Should allow transition to FAILED from DELIVERED", async function () {
-                const { processor } = await getNamedAccounts();
                 const processorSigner = await ethers.getSigner(processor);
     
                 await messageRegistry.connect(processorSigner)
@@ -495,7 +480,6 @@ describe("MessageRegistry", function () {
     
         describe("Edge Cases", function () {
             it("Should handle maximum size payloads", async function () {
-                const { registrar, user } = await getNamedAccounts();
                 const largePayload = ethers.toUtf8Bytes("x".repeat(24576)); // 24KB
     
                 const messageId = await messageRegistry.generateMessageId(
@@ -513,7 +497,6 @@ describe("MessageRegistry", function () {
             });
     
             it("Should handle different message types", async function () {
-                const { registrar, user } = await getNamedAccounts();
                 const messageTypes = [
                     ethers.encodeBytes32String("PACS.008"),
                     ethers.encodeBytes32String("PACS.009"),
@@ -537,7 +520,6 @@ describe("MessageRegistry", function () {
             });
     
             it("Should handle concurrent messages to same target", async function () {
-                const { registrar, user } = await getNamedAccounts();
                 const registrarSigner = await ethers.getSigner(registrar);
                 const promises = [];
                 const messageIds = [];

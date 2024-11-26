@@ -8,7 +8,10 @@ import "dotenv/config";
 
 const MNEMONIC = process.env.MNEMONIC || "";
 const RPC_URL = process.env.ALCHEMY_API_URL || ""
-const LOCALHOST_RPC_URL = process.env.LOCALHOST_RPC_URL || ""
+const LOCALHOST_RPC_HOST = process.env.LOCALHOST_RPC_HOST || ""
+const GANACHE_PORT = process.env.GANACHE_PORT || ""
+const GETH_RPC_PORT = process.env.GETH_RPC_PORT || ""
+const HARDHAT_PORT = process.env.HARDHAT_PORT || ""
 
 const config: HardhatUserConfig = {
     solidity: {
@@ -27,62 +30,10 @@ const config: HardhatUserConfig = {
         admin: {
             default: 1,
         },
-        liquidityPoolAdmin: {
-            default: 1,
-        },
-        provider: {
-            default: 1,
-        },
-        governor: {
-            default: 1,
-        },
-        executor: {
-            default: 2,
-        },
-        emergencyAdmin: {
-            default: 2,
-        },
-        settler: {
-            default: 3,
-        },
-        operator: {
-            default: 3,
-        },
-        validator: {
-            default: 4,
-        },
-        formatAdmin: {
-            default: 5,
-        },
-        msgHandlerAdmin: {
-            default: 5,
-        },
-        registrar: {
-            default: 6,
-        },
-        processor: {
-            default: 7,
-        },
-        user: {
-            default: 7,
-        },
-        voter: {
-            default: 6,
-        },
-        voter1: {
-            default: 6,
-        },
-        voter2: {
-            default: 7,
-        },
-        voter3: {
-            default: 8,
-        },
     },
     networks: {
         // Hardhat network for unit testing
         hardhat: {
-            tags: ["unit"], // Tag for unit testing
             /*
             forking: {
                 url: TESTNET_RPC_URL, // Replace with actual RPC URL
@@ -94,17 +45,26 @@ const config: HardhatUserConfig = {
                 count: 10, // Enough accounts for unit tests
                 mnemonic: MNEMONIC, // Optional, for deterministic accounts
             },
-            live: false, // Not a live network
+            live: false,
         },
         // Custom integration testing network
-        gana: {
-            url: LOCALHOST_RPC_URL, // Custom URL for integration testing
+        ganache: {
+            url: LOCALHOST_RPC_HOST + ":" + GANACHE_PORT,
             accounts: {
                 count: 10, // Enough accounts for integration tests
                 mnemonic: MNEMONIC, // Optional, for deterministic accounts
             },
-            live: true, // Not a live network
-            chainId: 1337, // 
+            live: true,
+            chainId: 1337,
+        },
+        geth: {
+            url: LOCALHOST_RPC_HOST + ":" + GETH_RPC_PORT,
+            accounts: {
+                count: 10, // Enough accounts for integration tests
+                mnemonic: MNEMONIC, // Optional, for deterministic accounts
+            },
+            live: true,
+            chainId: 1337,
         },
         // Sepolia testnet for live testing
         sepolia: {

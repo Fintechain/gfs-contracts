@@ -5,6 +5,7 @@ import { isProductionMarket, isTestnetMarket, loadProtocolConfig } from "../../s
 import { MESSAGE_TYPE_PACS008, PACS008_REQUIRED_FIELDS } from "../../src/types/";
 import { SettlementController } from "../../typechain";
 import { network } from "hardhat";
+import { isUnitMode } from "../../src/utils/deploy-helper";
 
 const func: DeployFunction = async function ({
     getNamedAccounts,
@@ -20,7 +21,7 @@ const func: DeployFunction = async function ({
 
     const isUnitTest = hre.network.tags.unit;
 
-    if (!network.live) {
+    if (isUnitMode()) {
 
         settlementController = await get("MockSettlementController");
         settlementControllerContract = await hre.ethers.getContractAt("MockSettlementController", settlementController.address);
@@ -44,7 +45,7 @@ const func: DeployFunction = async function ({
 
 
     const adminSigner = await hre.ethers.getSigner(admin);
-    if (network.live) {
+    if (!isUnitMode()) {
 
         // 1. Grant SettlementController's HANDLER_ROLE to the handler
         const controller = settlementControllerContract as SettlementController
