@@ -120,8 +120,8 @@ contract ProtocolCoordinator is
             submission.payload
         );
 
-        // For local messages (targetChain == 0), mark as processed immediately
-        if (submission.targetChain == 0) {
+        // For local messages (targetChain == 1), mark as processed immediately
+        if (submission.targetChain == 1) {
             messageRegistry.updateMessageStatus(
                 messageId,
                 IMessageRegistry.MessageStatus.DELIVERED

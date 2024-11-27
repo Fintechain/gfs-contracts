@@ -11,11 +11,11 @@
     "test:unit": "DEPLOY_MODE=unit npx hardhat test test/unit/**/* --network hardhat",
     "test:integration": "DEPLOY_MODE=integration npx hardhat test test/integration/**/* --network hardhat",
 
-    "test:ganache:unit": "DEPLOY_MODE=unit npm run deploy:ganache && npx hardhat test test/unit/**/* --network ganache",
-    "test:ganache:integration": "DEPLOY_MODE=integration npm run deploy:ganache && DEPLOY_MODE=integration npx hardhat test test/integration/**/* --network ganache",
+    "test:ganache:unit": "DEPLOY_MODE=unit npx hardhat test test/unit/**/* --network ganache",
+    "test:ganache:integration": "DEPLOY_MODE=integration npx hardhat test test/integration/**/* --network ganache",
 
-    "test:geth:unit": "DEPLOY_MODE=unit npm run deploy:geth && npx hardhat test test/unit/**/* --network geth",
-    "test:geth:integration": "DEPLOY_MODE=integration npm run deploy:geth && DEPLOY_MODE=integration npx hardhat test test/integration/**/* --network geth"
+    "test:geth:unit": "DEPLOY_MODE=unit npx hardhat test test/unit/**/* --network geth",
+    "test:geth:integration": "DEPLOY_MODE=integration npx hardhat test test/integration/**/* --network geth"
   },
   "keywords": [],
   "author": "",

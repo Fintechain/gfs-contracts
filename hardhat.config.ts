@@ -7,11 +7,18 @@ import '@nomicfoundation/hardhat-chai-matchers'
 import "dotenv/config";
 
 const MNEMONIC = process.env.MNEMONIC || "";
-const RPC_URL = process.env.ALCHEMY_API_URL || ""
-const LOCALHOST_RPC_HOST = process.env.LOCALHOST_RPC_HOST || ""
-const GANACHE_PORT = process.env.GANACHE_PORT || ""
-const GETH_RPC_PORT = process.env.GETH_RPC_PORT || ""
-const HARDHAT_PORT = process.env.HARDHAT_PORT || ""
+const RPC_URL = process.env.ALCHEMY_API_URL || "";
+const LOCALHOST_RPC_HOST = process.env.LOCALHOST_RPC_HOST || "http://127.0.0.1";
+const GANACHE_PORT = process.env.GANACHE_PORT || "8545";
+const GETH_RPC_PORT = process.env.GETH_RPC_PORT || "8546";
+const HARDHAT_PORT = process.env.HARDHAT_PORT || "8547";
+
+// Logging configuration
+console.log('Network Configuration:', {
+    ganacheUrl: `${LOCALHOST_RPC_HOST}:${GANACHE_PORT}`,
+    gethUrl: `${LOCALHOST_RPC_HOST}:${GETH_RPC_PORT}`,
+    mnemonic: MNEMONIC ? 'Set' : 'Not Set'
+});
 
 const config: HardhatUserConfig = {
     solidity: {
@@ -30,54 +37,67 @@ const config: HardhatUserConfig = {
         admin: {
             default: 1,
         },
+        user: {
+            default: 2,
+        },
+        voter1: {
+            default: 3,
+        }
     },
     networks: {
-        // Hardhat network for unit testing
         hardhat: {
-            /*
-            forking: {
-                url: TESTNET_RPC_URL, // Replace with actual RPC URL
-                // blockNumber: TESTNET_BLOCK_NUMBER, // Use for reproducible tests
-                enabled: true
-            },
-            */
             accounts: {
-                count: 10, // Enough accounts for unit tests
-                mnemonic: MNEMONIC, // Optional, for deterministic accounts
+                count: 10,
+                mnemonic: MNEMONIC,
             },
             live: false,
+            saveDeployments: true,
         },
-        // Custom integration testing network
         ganache: {
-            url: LOCALHOST_RPC_HOST + ":" + GANACHE_PORT,
+            url: `${LOCALHOST_RPC_HOST}:${GANACHE_PORT}`,
             accounts: {
-                count: 10, // Enough accounts for integration tests
-                mnemonic: MNEMONIC, // Optional, for deterministic accounts
+                count: 10,
+                mnemonic: MNEMONIC,
             },
-            live: true,
             chainId: 1337,
+            live: true,
+            saveDeployments: true,
+            tags: ["local", "test"],
+            loggingEnabled: true,
         },
         geth: {
-            url: LOCALHOST_RPC_HOST + ":" + GETH_RPC_PORT,
+            url: `${LOCALHOST_RPC_HOST}:${GETH_RPC_PORT}`,
             accounts: {
-                count: 10, // Enough accounts for integration tests
-                mnemonic: MNEMONIC, // Optional, for deterministic accounts
+                count: 10,
+                mnemonic: MNEMONIC,
             },
-            live: true,
             chainId: 1337,
+            live: true,
+            saveDeployments: true,
+            tags: ["local", "test"],
+            loggingEnabled: true,
         },
-        // Sepolia testnet for live testing
         sepolia: {
-            url: RPC_URL, // Replace with actual RPC URL
+            url: RPC_URL,
             accounts: {
-                mnemonic: MNEMONIC, // Same mnemonic across environments for simplicity
+                mnemonic: MNEMONIC,
             },
-            chainId: 11155111, // Explicit Sepolia chain ID
+            chainId: 11155111,
+            live: true,
+            saveDeployments: true,
+            tags: ["staging"],
         },
     },
     typechain: {
         outDir: "typechain",
         target: "ethers-v6",
+    },
+    paths: {
+        deployments: 'deployments',
+        tests: 'test',
+    },
+    mocha: {
+        timeout: 40000,
     },
 };
 

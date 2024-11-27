@@ -11,10 +11,10 @@ import {
 } from "../../../typechain";
 import { deployContractsFixture } from "./fixture";
 import { PACS008MessageServiceImpl } from "../../../src/services/pacs008-message.service";
-import { 
-    MessageSubmissionResponse, 
-    TransactionStatus, 
-    MessageSubmissionError 
+import {
+    MessageSubmissionResponse,
+    TransactionStatus,
+    MessageSubmissionError
 } from "../../../src/types/message-service";
 
 /**
@@ -79,7 +79,7 @@ describe("End-to-End Local Message Processing Debug", function () {
             contracts.protocolCoordinator,
             1 // Local routing chain ID
         );
-        
+
         // Prepare test message data with valid instruction ID
         const messageData = {
             debtorAddr: debitor,
@@ -89,9 +89,9 @@ describe("End-to-End Local Message Processing Debug", function () {
             instructionId: generateInstructionId(),
             handlerAddr: handlerAddress
         };
-        
+
         let submissionResponse: MessageSubmissionResponse;
-        
+
         try {
             // Log test message data for debugging
             console.log('Submitting message with data:', {
@@ -105,7 +105,7 @@ describe("End-to-End Local Message Processing Debug", function () {
 
             // Submit the message with confirmation options
             submissionResponse = await msgService.submitMessage(
-                messageData, 
+                messageData,
                 creditorSigner,
                 {
                     confirmations: EXPECTED_CONFIRMATIONS,
@@ -120,14 +120,22 @@ describe("End-to-End Local Message Processing Debug", function () {
             // Verify transaction status
             expect(submissionResponse.status).to.equal(TransactionStatus.CONFIRMED);
             console.log(submissionResponse)
-            
-            // Find MessageSubmissionInitiated event
+
+            // Log all events with their details
+            console.log('Events:', submissionResponse.events?.map(event => ({
+                name: event.fragment?.name,  // Try fragment.name instead of eventName
+                args: event.args,
+                topics: event.topics,
+                data: event.data
+            })));
+
+            // Modify the event search to use fragment.name
             const submissionEvent = submissionResponse.events?.find(
-                event => event.eventName === "MessageSubmissionInitiated"
+                event => event.fragment?.name === "MessageSubmissionInitiated"
             );
-            
+
             expect(submissionEvent, "MessageSubmissionInitiated event not found").to.exist;
-            
+
             // Extract message ID from event
             const messageId = submissionEvent?.args?.messageId;
             expect(messageId, "Message ID not found in event").to.exist;
@@ -138,7 +146,7 @@ describe("End-to-End Local Message Processing Debug", function () {
 
             // Verify message chain ID
             expect(Number(message.targetChain))
-                .to.equal(0, "Target chain should be 0 for local routing");
+                .to.equal(1, "Target chain should be 0 for local routing");
 
             // Wait for message processing using helper function
             await waitForMessageProcessing(messageId, MESSAGE_PROCESSED_STATE);
@@ -151,7 +159,7 @@ describe("End-to-End Local Message Processing Debug", function () {
             // Log gas usage information
             if (submissionResponse.gasInfo) {
                 console.log('Gas Usage:', {
-                    gasLimit: submissionResponse.gasInfo.gasLimit.toString(),
+                    //: submissionResponse.gasInfo.gasLimit.toString(),
                     gasUsed: submissionResponse.gasInfo.gasUsed.toString(),
                     effectiveGasPrice: ethers.formatUnits(
                         submissionResponse.gasInfo.effectiveGasPrice,
