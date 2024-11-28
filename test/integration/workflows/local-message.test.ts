@@ -72,6 +72,7 @@ describe("End-to-End Local Message Processing Debug", function () {
         // Get test accounts
         const { admin } = await getNamedAccounts();
         const creditorSigner = await ethers.getSigner(creditor);
+        const adminSigner = await ethers.getSigner(admin);
 
         // Initialize service with local chain ID
         const handlerAddress = await contracts.messageHandler.getAddress();
@@ -106,7 +107,7 @@ describe("End-to-End Local Message Processing Debug", function () {
             // Submit the message with confirmation options
             submissionResponse = await msgService.submitMessage(
                 messageData,
-                creditorSigner,
+                adminSigner,
                 {
                     confirmations: EXPECTED_CONFIRMATIONS,
                     timeout: TRANSACTION_TIMEOUT,

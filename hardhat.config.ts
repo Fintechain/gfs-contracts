@@ -8,15 +8,12 @@ import "dotenv/config";
 
 const MNEMONIC = process.env.MNEMONIC || "";
 const RPC_URL = process.env.ALCHEMY_API_URL || "";
-const LOCALHOST_RPC_HOST = process.env.LOCALHOST_RPC_HOST || "http://127.0.0.1";
+const GANACHE_HOST = process.env.GANACHE_HOST || "ganache";
 const GANACHE_PORT = process.env.GANACHE_PORT || "8545";
-const GETH_RPC_PORT = process.env.GETH_RPC_PORT || "8546";
-const HARDHAT_PORT = process.env.HARDHAT_PORT || "8547";
 
 // Logging configuration
 console.log('Network Configuration:', {
-    ganacheUrl: `${LOCALHOST_RPC_HOST}:${GANACHE_PORT}`,
-    gethUrl: `${LOCALHOST_RPC_HOST}:${GETH_RPC_PORT}`,
+    ganacheUrl: `http://${GANACHE_HOST}:${GANACHE_PORT}`,
     mnemonic: MNEMONIC ? 'Set' : 'Not Set'
 });
 
@@ -37,45 +34,30 @@ const config: HardhatUserConfig = {
         admin: {
             default: 1,
         },
-        user: {
-            default: 2,
-        },
-        voter1: {
-            default: 3,
-        }
     },
     networks: {
         hardhat: {
             accounts: {
-                count: 10,
                 mnemonic: MNEMONIC,
+                count: 10,
+                accountsBalance: "1000000000000000000000", // 1000 ETH
             },
             live: false,
             saveDeployments: true,
         },
         ganache: {
-            url: `${LOCALHOST_RPC_HOST}:${GANACHE_PORT}`,
+            url: `http://${GANACHE_HOST}:${GANACHE_PORT}`,
             accounts: {
-                count: 10,
                 mnemonic: MNEMONIC,
+                count: 10,
+                accountsBalance: "1000000000000000000000", // 1000 ETH
             },
             chainId: 1337,
             live: true,
             saveDeployments: true,
             tags: ["local", "test"],
             loggingEnabled: true,
-        },
-        geth: {
-            url: `${LOCALHOST_RPC_HOST}:${GETH_RPC_PORT}`,
-            accounts: {
-                count: 10,
-                mnemonic: MNEMONIC,
-            },
-            chainId: 1337,
-            live: true,
-            saveDeployments: true,
-            tags: ["local", "test"],
-            loggingEnabled: true,
+            gasLimit: 12000000,
         },
         sepolia: {
             url: RPC_URL,
