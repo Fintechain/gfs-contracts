@@ -274,7 +274,7 @@ export class PACS008MessageServiceImpl implements MessageService<PACS008Message>
      * @throws {MessageValidationError} If payload creation fails
      * @private
      */
-    private createPACS008Payload(message: PACS008Message): string {
+    public createPACS008Payload(message: PACS008Message): string {
         try {
             const encodedFields = [
                 {
