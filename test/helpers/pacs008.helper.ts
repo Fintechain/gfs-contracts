@@ -36,7 +36,6 @@ export const TEST_CONSTANTS = {
     /** Maximum allowed message amount (from PACS008Handler contract) */
     MAXIMUM_AMOUNT: ethers.parseEther("1000000"),
     /** Chain ID for local message routing */
-    LOCAL_CHAIN_ID: 1
 };
 
 /**

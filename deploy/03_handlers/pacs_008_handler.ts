@@ -6,6 +6,7 @@ import { MESSAGE_TYPE_PACS008, PACS008_REQUIRED_FIELDS } from "../../src/types/"
 import { SettlementController } from "../../typechain";
 import { network } from "hardhat";
 import { isUnitMode } from "../../src/utils/deploy-helper";
+import { LOCAL_CHAIN_ID } from "../../src/constants";
 
 const func: DeployFunction = async function ({
     getNamedAccounts,
@@ -73,7 +74,9 @@ const func: DeployFunction = async function ({
 
         // 4. Add Target route
         const targetRegistry = await hre.ethers.getContractAt("TargetRegistry", (await get("TargetRegistry")).address);
-        await targetRegistry.connect(adminSigner).registerTarget(deployment.address, 1, 0, hre.ethers.toUtf8Bytes("PACS008_HANDLER"));
+        
+        await targetRegistry.connect(adminSigner).registerTarget(
+            deployment.address, LOCAL_CHAIN_ID, 0, hre.ethers.toUtf8Bytes("PACS008_HANDLER"));
 
     }
 

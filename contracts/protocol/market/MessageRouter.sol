@@ -112,57 +112,7 @@ contract MessageRouter is
         emit CrossChainFeesUpdated(baseFee, feeMultiplier);
     }
 
-    // Convert uint16 to string
-    function uint16ToString(uint16 number) public pure returns (string memory) {
-        if (number == 0) {
-            return "0";
-        }
-
-        uint16 temp = number;
-        uint256 digits;
-
-        // Count digits
-        while (temp != 0) {
-            digits++;
-            temp /= 10;
-        }
-
-        bytes memory buffer = new bytes(digits);
-        while (number != 0) {
-            digits -= 1;
-            buffer[digits] = bytes1(uint8(48 + (number % 10)));
-            number /= 10;
-        }
-
-        return string(buffer);
-    }
-
-    // Concatenate strings
-    function concatenateStrings(
-        string memory a,
-        string memory b
-    ) public pure returns (string memory) {
-        return string(abi.encodePacked(a, " ", b));
-    }
-
-    function addressToString(
-        address _addr
-    ) internal pure returns (string memory) {
-        bytes memory addrBytes = abi.encodePacked(_addr);
-        bytes memory hexChars = "0123456789abcdef";
-        bytes memory str = new bytes(42); // 2 for "0x" and 40 for the address
-
-        str[0] = "0";
-        str[1] = "x";
-
-        for (uint256 i = 0; i < 20; i++) {
-            str[2 + i * 2] = hexChars[uint8(addrBytes[i] >> 4)];
-            str[3 + i * 2] = hexChars[uint8(addrBytes[i] & 0x0f)];
-        }
-
-        return string(str);
-    }
-
+    
     /**
      * @notice Route a message to its target
      * @param messageId ID of the message to route
@@ -192,18 +142,6 @@ contract MessageRouter is
             canRouteToTarget(target, targetChain),
             "MessageRouter: Invalid target"
         );
-        /* require(
-            canRouteToTarget(target, targetChain), 
-            concatenateStrings("MessageRouter: Invalid target", 
-            concatenateStrings(uint16ToString(targetChain), addressToString(target))
-            )
-        ); */
-
-        /* 
-        require(
-            canRouteToTarget(target, targetChain),
-            concatenateStrings("MessageRouter: Invalid target, ", concatenateStrings(uint16ToString(targetChain), addressToString(target)))
-        ); */
         require(payload.length > 0, "MessageRouter: Empty payload");
 
         uint256 deliveryCost = quoteRoutingFee(targetChain, payload.length);

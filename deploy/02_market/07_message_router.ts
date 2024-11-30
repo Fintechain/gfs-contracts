@@ -1,49 +1,44 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
-import { MessageRouter } from "../../typechain";
 import { COMMON_DEPLOY_PARAMS, MARKET_NAME } from "../../src/env";
-import { isTestnetMarket, loadProtocolConfig } from "../../src/market-config-helpers";
-import { network } from "hardhat";
-import { getDeploymentMode, isUnitMode } from "../../src/utils/deploy-helper";
-
-// Goerli testnet addresses - we'll use these for local hardhat node
-const WORMHOLE_ADDRESSES = {
-    wormhole: "0x706abc4E45D419950511e474C7B9Ed348A4a716c",
-    wormholeRelayer: "0x28D8F1Be96f97C1387e94A53e00eCcFb4E75175a"
-};
+import { loadProtocolConfig } from "../../src/market-config-helpers";
+import { isUnitMode } from "../../src/utils/deploy-helper";
+import { eEthereumNetwork, eNetwork } from "../../src/types";
+import { getWormholeAddresses } from "../../src/utils/wormhole-helper";
 
 const func: DeployFunction = async function ({
     getNamedAccounts,
     deployments,
     ...hre
 }: HardhatRuntimeEnvironment) {
-    const { deploy, get } = deployments;
+    const { deploy, get, log } = deployments;
     const { admin } = await getNamedAccounts();
+    const config = loadProtocolConfig(MARKET_NAME);
     const adminSigner = await hre.ethers.getSigner(admin);
 
-    // Get dependency addresses
-    var wormhole;
-    var wormholeRelayer;
     var targetRegistry;
     var messageProcessor;
 
+    const network = (
+        process.env.FORK ? process.env.FORK : hre.network.name
+    ) as eNetwork;
+
+    var { wormholeRelayer, wormhole } = getWormholeAddresses(network, config);
+
     if (isUnitMode()) {
 
-        await deploy("MockMessageRouter", { from: admin, args: [], ...COMMON_DEPLOY_PARAMS });
-
-        wormhole = (await get("MockWormhole")).address;
-        wormholeRelayer = ((await get("MockWormholeRelayer")).address);
-        /*  wormhole = WORMHOLE_ADDRESSES.wormhole
-         wormholeRelayer = WORMHOLE_ADDRESSES.wormholeRelayer; */
+        await deploy("MockMessageRouter",
+            { from: admin, args: [], ...COMMON_DEPLOY_PARAMS }
+        );
 
         targetRegistry = await get("MockTargetRegistry");
         messageProcessor = await get("MockMessageProcessor");
 
+        wormhole = (await get("MockWormhole")).address;
+        wormholeRelayer = ((await get("MockWormholeRelayer")).address);
+
     }
     else {
-        wormhole = WORMHOLE_ADDRESSES.wormhole
-        wormholeRelayer = WORMHOLE_ADDRESSES.wormholeRelayer;
-
         targetRegistry = await get("TargetRegistry");
         messageProcessor = await get("MessageProcessor");
     }
@@ -85,8 +80,8 @@ const func: DeployFunction = async function ({
     console.log("Network:", await hre.ethers.provider.getNetwork().then(n => `${n.name} (${n.chainId})`));
     console.log("MessageRouter:", deployment.address);
     console.log("\nDependencies:");
-    console.log("- WormholeRelayer:", WORMHOLE_ADDRESSES.wormholeRelayer);
-    console.log("- Wormhole:", WORMHOLE_ADDRESSES.wormhole);
+    console.log("- Wormhole:", wormhole);
+    console.log("- WormholeRelayer:", wormholeRelayer);
     console.log("- TargetRegistry:", targetRegistry.address);
     console.log("- MessageProcessor:", messageProcessor.address);
     console.log("\nDeployer:", admin);

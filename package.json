@@ -4,18 +4,15 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "deploy:hardhat": "npx hardhat deploy --network hardhat",
-    "deploy:ganache": "npx hardhat deploy --network ganache",
-    "deploy:geth": "npx hardhat deploy --network geth",
-
+    "deploy:hardhat": "DEPLOY_MODE=integration npx hardhat deploy --network hardhat",
+    "deploy:ganache": "DEPLOY_MODE=integration npx hardhat deploy --network ganache",
+    "deploy:sepolia": "DEPLOY_MODE=integration npx hardhat deploy --network sepolia",
+    "deploy:holesky": "DEPLOY_MODE=integration npx hardhat deploy --network holesky",
     "test:unit": "DEPLOY_MODE=unit npx hardhat test test/unit/**/* --network hardhat",
     "test:integration": "DEPLOY_MODE=integration npx hardhat test test/integration/**/* --network hardhat",
-
-    "test:ganache:unit": "DEPLOY_MODE=unit npx hardhat test test/unit/**/* --network ganache",
     "test:ganache:integration": "DEPLOY_MODE=integration npx hardhat test test/integration/**/* --network ganache",
-
-    "test:geth:unit": "DEPLOY_MODE=unit npx hardhat test test/unit/**/* --network geth",
-    "test:geth:integration": "DEPLOY_MODE=integration npx hardhat test test/integration/**/* --network geth"
+    "test:sepolia:integration": "DEPLOY_MODE=integration npx hardhat test test/integration/**/* --network sepolia",
+    "test:holesky:integration": "DEPLOY_MODE=integration npx hardhat test test/integration/**/* --network holesky"
   },
   "keywords": [],
   "author": "",

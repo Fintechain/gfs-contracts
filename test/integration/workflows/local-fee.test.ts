@@ -18,6 +18,7 @@ import {
 } from "../../helpers/pacs008.helper";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { MESSAGE_TYPE_PACS008 } from "../../../src/types/";
+import { LOCAL_CHAIN_ID } from "../../../src/constants";
 
 describe("PACS008 Fee-Related Integration Tests", function () {
     let contracts: {
@@ -40,10 +41,12 @@ describe("PACS008 Fee-Related Integration Tests", function () {
         contracts = await deployContractsFixture();
         const signers = await ethers.getSigners();
         [admin, sender, receiver] = signers;
+
         handlerAddress = await contracts.messageHandler.getAddress();
+        
         msgService = new PACS008MessageServiceImpl(
             contracts.protocolCoordinator,
-            TEST_CONSTANTS.LOCAL_CHAIN_ID
+            LOCAL_CHAIN_ID
         );
     });
 
@@ -69,7 +72,7 @@ describe("PACS008 Fee-Related Integration Tests", function () {
             const submission = {
                 messageType: ethers.solidityPackedKeccak256(["string"], ["pacs.008"]),
                 target: handlerAddress,
-                targetChain: TEST_CONSTANTS.LOCAL_CHAIN_ID,
+                targetChain: LOCAL_CHAIN_ID,
                 payload: await msgService.createPACS008Payload(messageData)
             };
 
@@ -103,7 +106,7 @@ describe("PACS008 Fee-Related Integration Tests", function () {
         const submission = {
             messageType: MESSAGE_TYPE_PACS008,
             target: handlerAddress,
-            targetChain: TEST_CONSTANTS.LOCAL_CHAIN_ID,
+            targetChain: LOCAL_CHAIN_ID,
             payload: payload
         };
 
@@ -164,7 +167,7 @@ describe("PACS008 Fee-Related Integration Tests", function () {
                 {
                     messageType: ethers.solidityPackedKeccak256(["string"], ["pacs.008"]),
                     target: handlerAddress,
-                    targetChain: TEST_CONSTANTS.LOCAL_CHAIN_ID,
+                    targetChain: LOCAL_CHAIN_ID,
                     payload: await msgService.createPACS008Payload(messageData)
                 },
                 { value: totalFee / 2n } // Half the required fee

@@ -19,6 +19,7 @@ import {
     verifyStateTransitions
 } from "../../helpers/pacs008.helper";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
+import { LOCAL_CHAIN_ID } from "../../../src/constants";
 
 /**
  * Test suite for PACS008 local message processing
@@ -41,7 +42,7 @@ describe("PACS008 Local Message Processing", function () {
     let sender1: SignerWithAddress;
     let sender2: SignerWithAddress;
     let receiver: SignerWithAddress;
-    
+
     // Service configuration
     let handlerAddress: string;
     let msgService: PACS008MessageServiceImpl;
@@ -60,10 +61,8 @@ describe("PACS008 Local Message Processing", function () {
 
         // Initialize message service
         handlerAddress = await contracts.messageHandler.getAddress();
-        msgService = new PACS008MessageServiceImpl(
-            contracts.protocolCoordinator,
-            TEST_CONSTANTS.LOCAL_CHAIN_ID
-        );
+        
+        msgService = new PACS008MessageServiceImpl(contracts.protocolCoordinator, LOCAL_CHAIN_ID);
     });
 
     /**
@@ -80,13 +79,13 @@ describe("PACS008 Local Message Processing", function () {
         );
 
         const { messageId } = await submitAndVerifyMessage(messageData, admin, msgService);
-        
+
         // Verify message processing
         await verifyMessageProcessed(contracts.messageRegistry, messageId);
 
         // Verify chain ID is correct
         const message = await contracts.messageRegistry.getMessage(messageId);
-        expect(Number(message.targetChain)).to.equal(TEST_CONSTANTS.LOCAL_CHAIN_ID);
+        expect(Number(message.targetChain)).to.equal(LOCAL_CHAIN_ID);
     });
 
     /**

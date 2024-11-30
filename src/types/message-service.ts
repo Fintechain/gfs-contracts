@@ -1,5 +1,14 @@
 import { ethers } from "ethers";
 
+export enum MessageStatus {
+    PENDING = 0,
+    DELIVERED = 1,
+    PROCESSED = 2,
+    SETTLED = 3,
+    FAILED = 4,
+    CANCELLED = 5
+}
+
 /**
  * Base error class for message processing errors
  * Extends the native Error class with additional context

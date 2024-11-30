@@ -124,8 +124,9 @@ export class PACS008MessageServiceImpl implements MessageService<PACS008Message>
             if (error instanceof MessageValidationError) {
                 throw error;
             }
+            const errorMessage = error instanceof Error ? error.message : String(error);
             throw new MessageSubmissionError(
-                'Failed to submit PACS008 message',
+                `Failed to submit PACS008 message: ${errorMessage}`,
                 error
             );
         }
@@ -194,7 +195,7 @@ export class PACS008MessageServiceImpl implements MessageService<PACS008Message>
      * @throws {MessageValidationError} If validation fails
      * @private
      */
-    private validateMessage(message: PACS008Message): void {
+    public validateMessage(message: PACS008Message): void {
         // Validate all required addresses
         const addressValidations = [
             { address: message.debtorAddr, field: 'debtor' },

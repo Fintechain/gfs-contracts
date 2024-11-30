@@ -7,7 +7,8 @@ import '@nomicfoundation/hardhat-chai-matchers'
 import "dotenv/config";
 
 const MNEMONIC = process.env.MNEMONIC || "";
-const RPC_URL = process.env.ALCHEMY_API_URL || "";
+const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || "";
+const HOLESKY_RPC_URL = process.env.HOLESKY_RPC_URL || "";
 const GANACHE_HOST = process.env.GANACHE_HOST || "ganache";
 const GANACHE_PORT = process.env.GANACHE_PORT || "8545";
 
@@ -32,11 +33,14 @@ const config: HardhatUserConfig = {
             default: 0,
         },
         admin: {
-            default: 1,
+            default: 0,
         },
     },
     networks: {
         hardhat: {
+            forking: {
+                url: HOLESKY_RPC_URL, // Use Alchemy or Infura URL
+            },
             accounts: {
                 mnemonic: MNEMONIC,
                 count: 10,
@@ -60,11 +64,21 @@ const config: HardhatUserConfig = {
             gasLimit: 12000000,
         },
         sepolia: {
-            url: RPC_URL,
+            url: SEPOLIA_RPC_URL,
             accounts: {
                 mnemonic: MNEMONIC,
             },
-            chainId: 11155111,
+            chainId: 11155111, // Sepolia Chain ID
+            live: true,
+            saveDeployments: true,
+            tags: ["staging"],
+        },
+        holesky: {
+            url: HOLESKY_RPC_URL,
+            accounts: {
+                mnemonic: MNEMONIC,
+            },
+            chainId: 17000, // Holesky Chain ID
             live: true,
             saveDeployments: true,
             tags: ["staging"],
