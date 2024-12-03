@@ -8,7 +8,7 @@ export async function deployContractsFixture() {
     const deployResult = await deployments.fixture([
         'PACS008Handler'
     ], {
-        keepExistingDeployments: false
+        keepExistingDeployments: true
     });
     
     // Get contract instances

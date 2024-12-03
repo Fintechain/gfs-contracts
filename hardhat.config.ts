@@ -12,12 +12,6 @@ const HOLESKY_RPC_URL = process.env.HOLESKY_RPC_URL || "";
 const GANACHE_HOST = process.env.GANACHE_HOST || "ganache";
 const GANACHE_PORT = process.env.GANACHE_PORT || "8545";
 
-// Logging configuration
-console.log('Network Configuration:', {
-    ganacheUrl: `http://${GANACHE_HOST}:${GANACHE_PORT}`,
-    mnemonic: MNEMONIC ? 'Set' : 'Not Set'
-});
-
 const config: HardhatUserConfig = {
     solidity: {
         version: "0.8.24",
@@ -38,9 +32,9 @@ const config: HardhatUserConfig = {
     },
     networks: {
         hardhat: {
-            forking: {
-                url: HOLESKY_RPC_URL, // Use Alchemy or Infura URL
-            },
+            /* forking: {
+                url: SEPOLIA_RPC_URL, // Use Alchemy or Infura URL
+            }, */
             accounts: {
                 mnemonic: MNEMONIC,
                 count: 10,
@@ -54,34 +48,40 @@ const config: HardhatUserConfig = {
             accounts: {
                 mnemonic: MNEMONIC,
                 count: 10,
-                accountsBalance: "1000000000000000000000", // 1000 ETH
+                //                accountsBalance: "1000000000000000000000", // 1000 ETH
             },
             chainId: 1337,
             live: true,
             saveDeployments: true,
             tags: ["local", "test"],
             loggingEnabled: true,
-            gasLimit: 12000000,
+            //            gasLimit: 12000000,
         },
         sepolia: {
             url: SEPOLIA_RPC_URL,
             accounts: {
                 mnemonic: MNEMONIC,
             },
-            chainId: 11155111, // Sepolia Chain ID
+            chainId: 11155111,
             live: true,
             saveDeployments: true,
             tags: ["staging"],
+            gasPrice: "auto",
+            gasMultiplier: 5,               // 5x multiplier
+            timeout: 60000,                 // Increase timeout to 60 seconds
         },
+
         holesky: {
             url: HOLESKY_RPC_URL,
             accounts: {
                 mnemonic: MNEMONIC,
             },
-            chainId: 17000, // Holesky Chain ID
+            chainId: 17000,
             live: true,
             saveDeployments: true,
             tags: ["staging"],
+            gasPrice: "auto",
+            gasMultiplier: 1.3,
         },
     },
     typechain: {

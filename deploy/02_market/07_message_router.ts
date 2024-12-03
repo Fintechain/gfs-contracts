@@ -5,6 +5,7 @@ import { loadProtocolConfig } from "../../src/market-config-helpers";
 import { isUnitMode } from "../../src/utils/deploy-helper";
 import { eEthereumNetwork, eNetwork } from "../../src/types";
 import { getWormholeAddresses } from "../../src/utils/wormhole-helper";
+import { MessageProcessor } from "../../typechain";
 
 const func: DeployFunction = async function ({
     getNamedAccounts,
@@ -56,7 +57,7 @@ const func: DeployFunction = async function ({
 
     if (!isUnitMode()) {
         // 1. Grant MessageProcessor's PROCESSOR_ROLE to the MessageRouter contract
-        const messageProcessorContract = await hre.ethers.getContractAt("MessageProcessor", messageProcessor.address);
+        const messageProcessorContract = await hre.ethers.getContractAt("MessageProcessor", messageProcessor.address) as MessageProcessor;
         await messageProcessorContract.connect(
             adminSigner).grantRole(await messageProcessorContract.PROCESSOR_ROLE(), deployment.address);
 
