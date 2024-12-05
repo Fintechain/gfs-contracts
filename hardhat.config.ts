@@ -32,9 +32,20 @@ const config: HardhatUserConfig = {
     },
     networks: {
         hardhat: {
-            /* forking: {
+            forking: {
                 url: SEPOLIA_RPC_URL, // Use Alchemy or Infura URL
-            }, */
+                blockNumber: 7193483
+            },
+            accounts: {
+                mnemonic: MNEMONIC,
+                count: 10,
+                accountsBalance: "1000000000000000000000", // 1000 ETH
+            },
+            live: false,
+            saveDeployments: true,
+        },
+        localhost: {
+            url: "http://localhost:8545",
             accounts: {
                 mnemonic: MNEMONIC,
                 count: 10,
@@ -44,7 +55,7 @@ const config: HardhatUserConfig = {
             saveDeployments: true,
         },
         ganache: {
-            url: `http://${GANACHE_HOST}:${GANACHE_PORT}`,
+            url: `http://0.0.0.0:${GANACHE_PORT}`,
             accounts: {
                 mnemonic: MNEMONIC,
                 count: 10,
@@ -65,9 +76,6 @@ const config: HardhatUserConfig = {
             chainId: 11155111,
             live: true,
             saveDeployments: true,
-            tags: ["staging"],
-            gasPrice: "auto",
-            gasMultiplier: 5,               // 5x multiplier
             timeout: 60000,                 // Increase timeout to 60 seconds
         },
 
@@ -79,9 +87,7 @@ const config: HardhatUserConfig = {
             chainId: 17000,
             live: true,
             saveDeployments: true,
-            tags: ["staging"],
-            gasPrice: "auto",
-            gasMultiplier: 1.3,
+            timeout: 60000,   // Increase timeout to 60 seconds
         },
     },
     typechain: {

@@ -147,6 +147,13 @@ contract ProtocolCoordinator is
     function quoteMessageFee(
         MessageSubmission calldata submission
     ) public view override returns (uint256 _baseFee, uint256 _deliveryFee) {
+        require(
+            address(messageRouter) != address(0),
+            "MessageRouter not initialized"
+        );
+        require(submission.targetChain > 0, "Invalid chain ID");
+        require(submission.payload.length > 0, "Empty payload");
+        
         _baseFee = baseFee;
         _deliveryFee = messageRouter.quoteRoutingFee(
             submission.targetChain,

@@ -55,7 +55,7 @@ const func: DeployFunction = async function ({
         ...COMMON_DEPLOY_PARAMS
     });
 
-    if (!isUnitMode()) {
+    /* if (!isUnitMode()) {
         // 1. Grant MessageProcessor's PROCESSOR_ROLE to the MessageRouter contract
         const messageProcessorContract = await hre.ethers.getContractAt("MessageProcessor", messageProcessor.address) as MessageProcessor;
         await messageProcessorContract.connect(
@@ -74,6 +74,50 @@ const func: DeployFunction = async function ({
         console.log("MessageRouter has VALIDATOR_ROLE in TargetRegistry:",
             await targetRegistryContract.hasRole(await targetRegistryContract.VALIDATOR_ROLE(), deployment.address)
         );
+    } */
+
+    // Replace the permission granting section with this updated version
+    if (!isUnitMode()) {
+        console.log("Granting roles to MessageRouter...");
+
+        const messageProcessorContract = await hre.ethers.getContractAt(
+            "MessageProcessor",
+            messageProcessor.address
+        ) as MessageProcessor;
+
+        // Grant PROCESSOR_ROLE with explicit wait
+        const processorTx = await messageProcessorContract.connect(adminSigner)
+            .grantRole(await messageProcessorContract.PROCESSOR_ROLE(), deployment.address);
+        console.log("Waiting for PROCESSOR_ROLE transaction...");
+        await processorTx.wait(2); // Wait for 2 confirmations
+
+        // Grant VALIDATOR_ROLE with explicit wait
+        const targetRegistryContract = await hre.ethers.getContractAt(
+            "TargetRegistry",
+            targetRegistry.address
+        );
+        const validatorTx = await targetRegistryContract.connect(adminSigner)
+            .grantRole(await targetRegistryContract.VALIDATOR_ROLE(), deployment.address);
+        console.log("Waiting for VALIDATOR_ROLE transaction...");
+        await validatorTx.wait(2); // Wait for 2 confirmations
+
+        // Verify roles after confirmation
+        const hasProcessorRole = await messageProcessorContract.hasRole(
+            await messageProcessorContract.PROCESSOR_ROLE(),
+            deployment.address
+        );
+        const hasValidatorRole = await targetRegistryContract.hasRole(
+            await targetRegistryContract.VALIDATOR_ROLE(),
+            deployment.address
+        );
+
+        if (!hasProcessorRole || !hasValidatorRole) {
+            throw new Error("Role assignment failed. Roles status: " +
+                `PROCESSOR_ROLE: ${hasProcessorRole}, ` +
+                `VALIDATOR_ROLE: ${hasValidatorRole}`);
+        }
+
+        console.log("Roles successfully granted to MessageRouter");
     }
 
     // Log deployment information

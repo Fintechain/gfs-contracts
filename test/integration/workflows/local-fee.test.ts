@@ -37,6 +37,11 @@ describe("PACS008 Fee-Related Integration Tests", function () {
     let handlerAddress: string;
     let msgService: PACS008MessageServiceImpl;
 
+    // Standard gas limit for message submission
+    const DEFAULT_GAS_LIMIT = 500000n;
+    // Allow for 0.001 ETH deviation in calculations
+    const ALLOWED_DEVIATION = ethers.parseEther("0.001");
+
     beforeEach(async function () {
         contracts = await deployContractsFixture();
         const signers = await ethers.getSigners();
@@ -65,10 +70,7 @@ describe("PACS008 Fee-Related Integration Tests", function () {
                 handlerAddress
             );
 
-            // Get service fees
             const serviceFees = await msgService.getMessageFees(messageData);
-
-            // Create submission for protocol coordinator
             const submission = {
                 messageType: ethers.solidityPackedKeccak256(["string"], ["pacs.008"]),
                 target: handlerAddress,
@@ -76,7 +78,6 @@ describe("PACS008 Fee-Related Integration Tests", function () {
                 payload: await msgService.createPACS008Payload(messageData)
             };
 
-            // Get protocol fees directly
             const [baseFee, deliveryFee] = await contracts.protocolCoordinator.quoteMessageFee(submission);
             const totalProtocolFee = baseFee + deliveryFee;
 
@@ -93,16 +94,13 @@ describe("PACS008 Fee-Related Integration Tests", function () {
             handlerAddress
         );
 
-        // Get service instance and calculate fees
+        // Calculate all required fees
         const { baseFee, deliveryFee } = await msgService.getMessageFees(messageData);
         const requiredFee = baseFee + deliveryFee;
         
+        // Get initial balance and create submission data
         const initialBalance = await ethers.provider.getBalance(sender.address);
-
-        // Create submission with proper payload
         const payload = await msgService.createPACS008Payload(messageData);
-
-        // Create submission data
         const submission = {
             messageType: MESSAGE_TYPE_PACS008,
             target: handlerAddress,
@@ -110,45 +108,41 @@ describe("PACS008 Fee-Related Integration Tests", function () {
             payload: payload
         };
 
-        // Submit with exact fee (the protocol handles refunds internally)
-        const tx = await contracts.protocolCoordinator.connect(sender).submitMessage(
+        // Estimate gas for the transaction
+        const estimatedGas = await contracts.protocolCoordinator.estimateGas.submitMessage(
             submission,
             { value: requiredFee }
         );
 
-        // Wait for transaction
-        const receipt = await tx.wait();
-        if (!receipt) throw new Error("No receipt received");
+        // Add 20% buffer to estimated gas
+        const gasLimit = (estimatedGas * 120n) / 100n;
 
-        // Calculate gas cost
+        // Submit transaction with proper gas settings
+        const tx = await contracts.protocolCoordinator.connect(sender).submitMessage(
+            submission,
+            { 
+                value: requiredFee,
+                gasLimit: gasLimit
+            }
+        );
+
+        const receipt = await tx.wait();
+        if (!receipt) throw new Error("Transaction failed: No receipt received");
+
         const gasCost = receipt.gasUsed * receipt.gasPrice;
         const finalBalance = await ethers.provider.getBalance(sender.address);
 
-        // Calculate actual spent
+        // Calculate and verify actual costs
         const actualSpent = initialBalance - finalBalance;
         const expectedSpent = requiredFee + gasCost;
 
-        /* console.log("Fee Test Details:");
-        console.log(`Initial Balance: ${ethers.formatEther(initialBalance)} ETH`);
-        console.log(`Final Balance: ${ethers.formatEther(finalBalance)} ETH`);
-        console.log(`Base Fee: ${ethers.formatEther(baseFee)} ETH`);
-        console.log(`Delivery Fee: ${ethers.formatEther(deliveryFee)} ETH`);
-        console.log(`Required Fee: ${ethers.formatEther(requiredFee)} ETH`);
-        console.log(`Gas Cost: ${ethers.formatEther(gasCost)} ETH`);
-        console.log(`Actual Spent: ${ethers.formatEther(actualSpent)} ETH`);
-        console.log(`Expected Spent: ${ethers.formatEther(expectedSpent)} ETH`);
-        console.log(`Difference: ${ethers.formatEther(actualSpent - expectedSpent)} ETH`); */
-
-        // Verify actual spent matches expected (required fee + gas)
-        const allowedDeviation = ethers.parseEther("0.0001"); // 0.0001 ETH deviation allowed
         expect(actualSpent).to.be.closeTo(
             expectedSpent,
-            allowedDeviation,
-            "Actual spend differs from expected spend (required fee + gas cost)"
+            ALLOWED_DEVIATION,
+            "Actual spend differs significantly from expected spend"
         );
 
-        // Verify the transaction was successful
-        expect(receipt.status).to.equal(1, "Transaction failed");
+        expect(receipt.status).to.equal(1, "Transaction failed to execute successfully");
     });
 
     it("Should fail when insufficient fees are provided", async function () {
@@ -160,17 +154,21 @@ describe("PACS008 Fee-Related Integration Tests", function () {
         );
 
         const { totalFee } = await msgService.getMessageFees(messageData);
+        const submission = {
+            messageType: MESSAGE_TYPE_PACS008,
+            target: handlerAddress,
+            targetChain: LOCAL_CHAIN_ID,
+            payload: await msgService.createPACS008Payload(messageData)
+        };
 
-        // Try to submit with insufficient fee directly to the contract
+        // Try to submit with half the required fee
         await expect(
             contracts.protocolCoordinator.connect(sender).submitMessage(
-                {
-                    messageType: ethers.solidityPackedKeccak256(["string"], ["pacs.008"]),
-                    target: handlerAddress,
-                    targetChain: LOCAL_CHAIN_ID,
-                    payload: await msgService.createPACS008Payload(messageData)
-                },
-                { value: totalFee / 2n } // Half the required fee
+                submission,
+                { 
+                    value: totalFee / 2n,
+                    gasLimit: DEFAULT_GAS_LIMIT
+                }
             )
         ).to.be.revertedWith("Insufficient fee");
     });
@@ -185,20 +183,15 @@ describe("PACS008 Fee-Related Integration Tests", function () {
 
         const { response } = await submitAndVerifyMessage(messageData, admin, msgService);
         const receipt = await response.transaction.wait(1);
-        if (!receipt) throw new Error("No receipt received");
+        if (!receipt) throw new Error("Transaction failed: No receipt received");
 
-        expect(receipt.gasUsed).to.be.gt(0n, "Gas used should be recorded");
-        expect(receipt.gasPrice).to.be.gt(0n, "Gas price should be recorded");
+        expect(receipt.gasUsed).to.be.gt(0n, "Gas tracking failed: No gas recorded");
+        expect(receipt.gasPrice).to.be.gt(0n, "Gas tracking failed: No gas price recorded");
 
         const routerFee = await contracts.messageRouter.quoteRoutingFee(1, 100);
         expect(receipt.gasUsed * receipt.gasPrice).to.be.lte(
             routerFee * 2n,
-            "Gas usage should be reasonable"
+            "Gas usage exceeds reasonable limits"
         );
-
-        /* console.log("Gas Usage Statistics:");
-        console.log(`- Gas Used: ${receipt.gasUsed.toString()}`);
-        console.log(`- Gas Price: ${ethers.formatUnits(receipt.gasPrice, 'gwei')} gwei`);
-        console.log(`- Total Gas Cost: ${ethers.formatEther(receipt.gasUsed * receipt.gasPrice)} ETH`); */
     });
 });

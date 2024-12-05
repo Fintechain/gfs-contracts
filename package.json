@@ -7,13 +7,17 @@
     "clean": "npx hardhat clean",
     "compile": "npx hardhat compile",
     "typechain": "npx hardhat typechain",
-    "node": "npx hardhat node",
-    "deploy:hardhat": "DEPLOY_MODE=integration npx hardhat deploy --network hardhat",
-    "deploy:ganache": "DEPLOY_MODE=integration npx hardhat deploy --network ganache",
+    "node": "DEPLOY_MODE=integration npx hardhat node",
+
+    "deploy:hardhat": "DEPLOY_MODE=integration npx hardhat deploy --reset --network hardhat",
+    "deploy:localhost": "DEPLOY_MODE=integration npx hardhat deploy --reset --network localhost",
+    "deploy:ganache": "DEPLOY_MODE=integration npx hardhat deploy --reset --network ganache",
     "deploy:sepolia": "DEPLOY_MODE=integration npx hardhat deploy --network sepolia",
     "deploy:holesky": "DEPLOY_MODE=integration npx hardhat deploy --network holesky",
+
     "test:unit": "DEPLOY_MODE=unit npx hardhat test test/unit/**/* --network hardhat",
     "test:integration": "DEPLOY_MODE=integration npx hardhat test test/integration/**/* --network hardhat",
+    "test:localhost:integration": "DEPLOY_MODE=integration npx hardhat test test/integration/**/* --network localhost",
     "test:ganache:integration": "DEPLOY_MODE=integration npx hardhat test test/integration/**/* --network ganache",
     "test:sepolia:integration": "DEPLOY_MODE=integration npx hardhat test test/integration/**/* --network sepolia",
     "test:holesky:integration": "DEPLOY_MODE=integration npx hardhat test test/integration/**/* --network holesky"

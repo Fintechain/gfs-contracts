@@ -1,10 +1,10 @@
 import { ethers } from "ethers";
 import { ProtocolCoordinator } from "../../typechain";
 import { MESSAGE_SELECTORS, MESSAGE_TYPE_PACS008, PACS008Message } from "../types/pacs-008";
-import { 
-    MessageService, 
-    MessageFees, 
-    MessageSubmissionError, 
+import {
+    MessageService,
+    MessageFees,
+    MessageSubmissionError,
     MessageValidationError,
     MessageSubmissionResponse,
     MessageSubmissionResponseImpl,
@@ -41,7 +41,7 @@ export class PACS008MessageServiceImpl implements MessageService<PACS008Message>
     constructor(
         private readonly protocolCoordinator: ProtocolCoordinator,
         private readonly chainId: number = 1
-    ) {}
+    ) { }
 
     /**
      * Calculates the fees required for submitting a PACS008 message
@@ -51,21 +51,37 @@ export class PACS008MessageServiceImpl implements MessageService<PACS008Message>
      * @throws {MessageSubmissionError} If fee calculation fails
      */
     async getMessageFees(message: PACS008Message): Promise<MessageFees> {
-        this.validateMessage(message);
-        
-        const payload = this.createPACS008Payload(message);
-        const submission = this.createSubmission(message, payload);
-
         try {
+            this.validateMessage(message);
+            const payload = this.createPACS008Payload(message);
+            const submission = this.createSubmission(message, payload);
+
+            // Add logging
+            /* console.log('Submission:', {
+                messageType: submission.messageType,
+                target: submission.target,
+                targetChain: submission.targetChain,
+                payloadLength: submission.payload.length
+            }); */
+
             const [baseFee, deliveryFee] = await this.protocolCoordinator.quoteMessageFee(submission);
+
+            // Add logging
+           /*  console.log('Fees:', {
+                baseFee: baseFee.toString(),
+                deliveryFee: deliveryFee.toString()
+            }); */
+
             return {
                 baseFee,
                 deliveryFee,
                 totalFee: baseFee + deliveryFee
             };
         } catch (error) {
+            // Add more detailed error info
+            const errorDetail = error instanceof Error ? error.message : String(error);
             throw new MessageSubmissionError(
-                'Failed to quote message fees',
+                `Failed to quote message fees: ${errorDetail}`,
                 error
             );
         }
@@ -145,7 +161,7 @@ export class PACS008MessageServiceImpl implements MessageService<PACS008Message>
     ): Promise<void> {
         // Validate message format and content
         this.validateMessage(message);
-        
+
         // Validate signer has a provider
         if (!signer.provider) {
             throw new MessageValidationError('Signer must be connected to a provider');
@@ -157,7 +173,7 @@ export class PACS008MessageServiceImpl implements MessageService<PACS008Message>
         // Validate signer has sufficient balance
         const signerAddress = await signer.getAddress();
         const balance = await signer.provider.getBalance(signerAddress);
-        
+
         if (balance < totalFee) {
             throw new MessageValidationError(
                 `Insufficient balance for fees. Required: ${ethers.formatEther(totalFee)} ETH`
