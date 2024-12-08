@@ -1,7 +1,9 @@
 import { ethers, deployments } from "hardhat";
 import { 
     ProtocolCoordinator, MessageRegistry, MessageProtocol, 
-    MessageRouter, MessageProcessor, PACS008Handler, SettlementController
+    MessageRouter, MessageProcessor, PACS008Handler, SettlementController,
+    ERC20Token,
+    LiquidityPool
 } from "../../../typechain";
 
 export async function deployContractsFixture() {
@@ -19,6 +21,8 @@ export async function deployContractsFixture() {
     let messageProcessor = await ethers.getContract<MessageProcessor>("MessageProcessor");
     let messageHandler = await ethers.getContract<PACS008Handler>("PACS008Handler");
     let settlementController = await ethers.getContract<SettlementController>("SettlementController");
+    let erc20Token = await ethers.getContract<ERC20Token>("ERC20Token");
+    let liquidityPool = await ethers.getContract<LiquidityPool>("LiquidityPool");
 
     return {
         protocolCoordinator,
@@ -27,6 +31,8 @@ export async function deployContractsFixture() {
         messageRouter,
         messageProcessor,
         messageHandler,
-        settlementController
+        settlementController,
+        erc20Token,
+        liquidityPool
     };
 }

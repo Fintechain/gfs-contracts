@@ -24,6 +24,7 @@ A. Registry Layer
 B. Processing Layer
    - MessageRouter: Message routing and delivery
    - MessageProcessor: Message-specific handling
+   - PACS008Handler: ISO20022 PACS008 message handler
    
 C. Settlement Layer
    - SettlementController: Cross-chain settlement management

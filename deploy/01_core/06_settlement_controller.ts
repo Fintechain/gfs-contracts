@@ -21,15 +21,15 @@ const func: DeployFunction = async function ({
     if (isUnitMode()) {
         await deploy("MockSettlementController", { from: admin, args: [],  ...COMMON_DEPLOY_PARAMS });
         
-        liquidityPool = (await get("MockLiquidityPool")).address;
+        liquidityPool = (await get("MockLiquidityPool"));
     }
     else {
-        liquidityPool = (await get("LiquidityPool")).address;
+        liquidityPool = (await get("LiquidityPool"));
     }
 
     const deployment = await deploy("SettlementController", {
         from: admin,
-        args: [liquidityPool],
+        args: [liquidityPool.address],
         ...COMMON_DEPLOY_PARAMS 
     });
 

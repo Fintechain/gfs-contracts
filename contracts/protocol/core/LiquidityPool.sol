@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -9,38 +10,84 @@ import "../../interfaces/ILiquidityPool.sol";
 
 /**
  * @title LiquidityPool
- * @notice Manages liquidity pools for settlements
+ * @notice Manages liquidity pools for settlements with improved security
  */
-contract LiquidityPool is ILiquidityPool, AccessControl, Pausable, ReentrancyGuard {
+contract LiquidityPool is
+    ILiquidityPool,
+    AccessControl,
+    Pausable,
+    ReentrancyGuard
+{
+    using SafeERC20 for IERC20;
+
     // Role definitions
-    bytes32 public constant LIQUIDITY_PROVIDER_ROLE = keccak256("LIQUIDITY_PROVIDER_ROLE");
+    bytes32 public constant LIQUIDITY_PROVIDER_ROLE =
+        keccak256("LIQUIDITY_PROVIDER_ROLE");
     bytes32 public constant SETTLEMENT_ROLE = keccak256("SETTLEMENT_ROLE");
+    bytes32 public constant EMERGENCY_ROLE = keccak256("EMERGENCY_ROLE");
+
+    // Constants
+    uint256 private constant WITHDRAWAL_COOLDOWN = 1 hours;
 
     // State variables
+    bool public permissionlessLiquidity;
+
     mapping(address => PoolInfo) private pools;
     mapping(bytes32 => uint256) private lockedAmounts;
+    mapping(address => bool) public blacklistedProviders;
     mapping(address => mapping(address => uint256)) private providerShares;
+    mapping(address => uint256) private totalTokenShares;
+    mapping(address => mapping(address => uint256)) private lastWithdrawalTime;
+    mapping(bytes32 => address) private settlementTokens;
 
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(LIQUIDITY_PROVIDER_ROLE, msg.sender);
         _grantRole(SETTLEMENT_ROLE, msg.sender);
+        _grantRole(EMERGENCY_ROLE, msg.sender);
     }
 
-    /**
-     * @notice Add liquidity to pool
-     * @param token Token address
-     * @param amount Amount to add
-     * @return shares Liquidity shares issued
-     */
+    function setPermissionlessLiquidity(
+        bool _permissionless
+    ) external override {
+        require(
+            hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
+            "LiquidityPool: Must have admin role"
+        );
+        permissionlessLiquidity = _permissionless;
+        emit PermissionlessLiquiditySet(_permissionless);
+    }
+
+    function setProviderBlacklist(
+        address provider,
+        bool blacklisted
+    ) external override {
+        require(
+            hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
+            "LiquidityPool: Must have admin role"
+        );
+        require(
+            provider != address(0),
+            "LiquidityPool: Invalid provider address"
+        );
+        blacklistedProviders[provider] = blacklisted;
+        emit ProviderBlacklistUpdated(provider, blacklisted);
+    }
+
     function addLiquidity(
         address token,
         uint256 amount
     ) external override whenNotPaused nonReentrant returns (uint256 shares) {
         require(
-            hasRole(LIQUIDITY_PROVIDER_ROLE, msg.sender),
-            "LiquidityPool: Must have provider role"
+            !blacklistedProviders[msg.sender],
+            "LiquidityPool: Provider is blacklisted"
         );
+        if (!permissionlessLiquidity) {
+            require(
+                hasRole(LIQUIDITY_PROVIDER_ROLE, msg.sender),
+                "LiquidityPool: Must have provider role"
+            );
+        }
         require(amount > 0, "LiquidityPool: Invalid amount");
         require(pools[token].isActive, "LiquidityPool: Pool not active");
 
@@ -50,17 +97,16 @@ contract LiquidityPool is ILiquidityPool, AccessControl, Pausable, ReentrancyGua
             "LiquidityPool: Exceeds max liquidity"
         );
 
-        // Calculate shares
-        shares = pool.totalLiquidity == 0 ? 
-            amount : (amount * _totalShares(token)) / pool.totalLiquidity;
-        
+        // Calculate shares with improved precision
+        shares = _calculateShares(token, amount, pool.totalLiquidity);
         require(shares > 0, "LiquidityPool: Zero shares");
 
-        // Transfer tokens
-        IERC20(token).transferFrom(msg.sender, address(this), amount);
+        // Transfer tokens first
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
 
         // Update state
         providerShares[token][msg.sender] += shares;
+        totalTokenShares[token] += shares;
         pool.totalLiquidity += amount;
         pool.availableLiquidity += amount;
 
@@ -68,12 +114,6 @@ contract LiquidityPool is ILiquidityPool, AccessControl, Pausable, ReentrancyGua
         return shares;
     }
 
-    /**
-     * @notice Remove liquidity from pool
-     * @param token Token address
-     * @param shares Shares to burn
-     * @return amount Amount of tokens returned
-     */
     function removeLiquidity(
         address token,
         uint256 shares
@@ -83,38 +123,39 @@ contract LiquidityPool is ILiquidityPool, AccessControl, Pausable, ReentrancyGua
             providerShares[token][msg.sender] >= shares,
             "LiquidityPool: Insufficient shares"
         );
+        require(
+            block.timestamp >=
+                lastWithdrawalTime[msg.sender][token] + WITHDRAWAL_COOLDOWN,
+            "LiquidityPool: Withdrawal too soon"
+        );
 
         PoolInfo storage pool = pools[token];
-        
-        // Calculate amount
-        amount = (shares * pool.totalLiquidity) / _totalShares(token);
+
+        // Calculate amount with improved precision
+        amount = (shares * pool.totalLiquidity) / totalTokenShares[token];
         require(
             pool.availableLiquidity >= amount,
-            "LiquidityPool: Insufficient available liquidity"
+            "Insufficient available liquidity"
         );
         require(
             pool.totalLiquidity - amount >= pool.minLiquidity,
-            "LiquidityPool: Below min liquidity"
+            "Below min liquidity"
         );
 
-        // Update state
+        // Update state before transfer
         providerShares[token][msg.sender] -= shares;
+        totalTokenShares[token] -= shares;
         pool.totalLiquidity -= amount;
         pool.availableLiquidity -= amount;
+        lastWithdrawalTime[msg.sender][token] = block.timestamp;
 
         // Transfer tokens
-        IERC20(token).transfer(msg.sender, amount);
+        IERC20(token).safeTransfer(msg.sender, amount);
 
         emit LiquidityRemoved(token, msg.sender, amount);
         return amount;
     }
 
-    /**
-     * @notice Lock liquidity for settlement
-     * @param token Token address
-     * @param amount Amount to lock
-     * @param settlementId Associated settlement ID
-     */
     function lockLiquidity(
         address token,
         uint256 amount,
@@ -122,14 +163,11 @@ contract LiquidityPool is ILiquidityPool, AccessControl, Pausable, ReentrancyGua
     ) external override whenNotPaused {
         require(
             hasRole(SETTLEMENT_ROLE, msg.sender),
-            "LiquidityPool: Must have settlement role"
+            "Must have settlement role"
         );
         _lockLiquidity(token, amount, settlementId);
     }
 
-    /**
-     * @notice Initiate a settlement and execute the token transfer
-     */
     function initiateSettlement(
         bytes32 settlementId,
         address token,
@@ -141,19 +179,80 @@ contract LiquidityPool is ILiquidityPool, AccessControl, Pausable, ReentrancyGua
             "LiquidityPool: Must have settlement role"
         );
         require(amount > 0, "LiquidityPool: Invalid amount");
+        require(recipient != address(0), "LiquidityPool: Invalid recipient");
 
-        require(_hasAvailableLiquidity(token, amount), "Insufficient liquidity");
-
+        // Lock liquidity first
         _lockLiquidity(token, amount, settlementId);
 
-        IERC20(token).transfer(recipient, amount);
+        // Do the transfer before updating pool state for locked liquidity
+        IERC20(token).safeTransfer(recipient, amount);
+
+        // Update pool state to reflect the settlement
+        PoolInfo storage pool = pools[token];
+        pool.totalLiquidity -= amount; // Add this line
+        pool.lockedLiquidity -= amount; // Release the locked liquidity immediately
 
         emit SettlementCompleted(settlementId, amount, recipient);
     }
 
-    /**
-     * @notice Check if pool has sufficient liquidity
-     */
+    function _lockLiquidity(
+        address token,
+        uint256 amount,
+        bytes32 settlementId
+    ) internal {
+        require(amount > 0, "Invalid amount");
+        require(lockedAmounts[settlementId] == 0, "Already locked");
+
+        PoolInfo storage pool = pools[token];
+        require(pool.isActive, "Pool not active");
+        require(pool.availableLiquidity >= amount, "Insufficient liquidity");
+
+        pool.availableLiquidity -= amount;
+        pool.lockedLiquidity += amount;
+        lockedAmounts[settlementId] = amount;
+        settlementTokens[settlementId] = token;
+
+        emit LiquidityLocked(token, settlementId, amount);
+    }
+
+    function unlockLiquidity(bytes32 settlementId) public whenNotPaused {
+        require(
+            hasRole(SETTLEMENT_ROLE, msg.sender),
+            "Must have settlement role"
+        );
+
+        uint256 amount = lockedAmounts[settlementId];
+        require(amount > 0, "Nothing locked");
+
+        address token = settlementTokens[settlementId];
+        require(token != address(0), "Invalid settlement");
+
+        PoolInfo storage pool = pools[token];
+        pool.lockedLiquidity -= amount;
+        pool.availableLiquidity += amount;
+        delete lockedAmounts[settlementId];
+        delete settlementTokens[settlementId];
+
+        emit LiquidityUnlocked(token, settlementId, amount);
+        emit LiquidityReleased(token, settlementId, amount);
+    }
+
+    function emergencyWithdraw(address token) external {
+        require(
+            hasRole(EMERGENCY_ROLE, msg.sender),
+            "Must have emergency role"
+        );
+        require(paused(), "Must be paused");
+        require(token != address(0), "Invalid token");
+
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        require(balance > 0, "No balance to withdraw");
+
+        IERC20(token).safeTransfer(msg.sender, balance);
+
+        emit EmergencyWithdraw(token, balance);
+    }
+
     function hasAvailableLiquidity(
         address token,
         uint256 amount
@@ -161,21 +260,12 @@ contract LiquidityPool is ILiquidityPool, AccessControl, Pausable, ReentrancyGua
         return _hasAvailableLiquidity(token, amount);
     }
 
-    /**
-     * @notice Get pool information for token
-     */
     function getPoolInfo(
         address token
     ) external view override returns (PoolInfo memory) {
         return pools[token];
     }
 
-    /**
-     * @notice Create new liquidity pool
-     * @param token Token address
-     * @param minLiquidity Minimum liquidity requirement
-     * @param maxLiquidity Maximum liquidity limit
-     */
     function createPool(
         address token,
         uint256 minLiquidity,
@@ -185,14 +275,16 @@ contract LiquidityPool is ILiquidityPool, AccessControl, Pausable, ReentrancyGua
             hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
             "LiquidityPool: Must have admin role"
         );
-        require(
-            !pools[token].isActive,
-            "LiquidityPool: Pool already exists"
-        );
-        require(
-            minLiquidity <= maxLiquidity,
-            "LiquidityPool: Invalid limits"
-        );
+        require(token != address(0), "LiquidityPool: Invalid token");
+        require(!pools[token].isActive, "LiquidityPool: Pool already exists");
+        require(minLiquidity <= maxLiquidity, "LiquidityPool: Invalid limits");
+
+        // Validate token implements ERC20
+        try IERC20(token).totalSupply() returns (uint256) {
+            // Token implements totalSupply
+        } catch {
+            revert("Invalid ERC20");
+        }
 
         pools[token] = PoolInfo({
             totalLiquidity: 0,
@@ -206,78 +298,65 @@ contract LiquidityPool is ILiquidityPool, AccessControl, Pausable, ReentrancyGua
         emit PoolCreated(token, minLiquidity, maxLiquidity);
     }
 
-    /**
-     * @notice Internal function for checking available liquidity
-     */
+    function updatePool(
+        address token,
+        uint256 minLiquidity,
+        uint256 maxLiquidity
+    ) external {
+        require(
+            hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
+            "Must have admin role"
+        );
+        require(pools[token].isActive, "Pool does not exist");
+        require(minLiquidity <= maxLiquidity, "Invalid limits");
+
+        PoolInfo storage pool = pools[token];
+        pool.minLiquidity = minLiquidity;
+        pool.maxLiquidity = maxLiquidity;
+
+        emit PoolUpdated(token, minLiquidity, maxLiquidity);
+    }
+
     function _hasAvailableLiquidity(
         address token,
         uint256 amount
     ) internal view returns (bool) {
         PoolInfo storage pool = pools[token];
+
+        // Additional diagnostic check
+        uint256 actualBalance = IERC20(token).balanceOf(address(this));
+        require(
+            actualBalance >= pool.availableLiquidity,
+            "Pool balance mismatch with recorded liquidity"
+        );
+
         return pool.isActive && pool.availableLiquidity >= amount;
     }
 
-    /**
-     * @notice Internal function for locking liquidity
-     */
-    function _lockLiquidity(
+    function _calculateShares(
         address token,
         uint256 amount,
-        bytes32 settlementId
-    ) internal {
-        require(amount > 0, "LiquidityPool: Invalid amount");
-        require(
-            lockedAmounts[settlementId] == 0,
-            "LiquidityPool: Already locked"
-        );
-
-        PoolInfo storage pool = pools[token];
-        require(pool.isActive, "LiquidityPool: Pool not active");
-        require(
-            pool.availableLiquidity >= amount,
-            "LiquidityPool: Insufficient liquidity"
-        );
-
-        pool.availableLiquidity -= amount;
-        pool.lockedLiquidity += amount;
-        lockedAmounts[settlementId] = amount;
-
-        emit LiquidityLocked(token, settlementId, amount);
-    }
-
-    /**
-     * @notice Get total shares for a token
-     */
-    function _totalShares(address token) internal view returns (uint256) {
-        uint256 total = 0;
-        // This could be optimized by tracking total shares in storage
-        for (uint256 i = 0; i < 10; i++) {
-            // Limit iteration to prevent DoS
-            if (providerShares[token][msg.sender] > 0) {
-                total += providerShares[token][msg.sender];
-            }
+        uint256 totalLiquidity
+    ) internal view returns (uint256) {
+        if (totalLiquidity == 0 || totalTokenShares[token] == 0) {
+            return amount;
         }
-        return total;
+        return (amount * totalTokenShares[token]) / totalLiquidity;
     }
 
-    /**
-     * @notice Pause the pool
-     */
+
     function pause() external {
         require(
-            hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
-            "LiquidityPool: Must have admin role"
+            hasRole(EMERGENCY_ROLE, msg.sender),
+            "Must have emergency role"
         );
         _pause();
     }
 
-    /**
-     * @notice Unpause the pool
-     */
     function unpause() external {
         require(
             hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
-            "LiquidityPool: Must have admin role"
+            "Must have admin role"
         );
         _unpause();
     }

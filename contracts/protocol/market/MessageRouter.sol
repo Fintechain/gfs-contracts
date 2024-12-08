@@ -112,7 +112,6 @@ contract MessageRouter is
         emit CrossChainFeesUpdated(baseFee, feeMultiplier);
     }
 
-    
     /**
      * @notice Route a message to its target
      * @param messageId ID of the message to route
@@ -208,16 +207,16 @@ contract MessageRouter is
         address target,
         bytes memory payload
     ) private returns (bytes32) {
-        // Process the message using handler
+        // Get message type and let processor handle it
         IMessageHandler handler = IMessageHandler(target);
-        bytes memory result = handler.handleMessage(messageId, payload);
+        bytes32 messageType = handler.getSupportedMessageTypes()[0];
 
-        // Process the result
+        // Let processor do the handling
         IMessageProcessor.ProcessingResult memory procResult = messageProcessor
             .processMessage(
                 messageId,
-                handler.getSupportedMessageTypes()[0],
-                result
+                messageType,
+                payload // Pass original payload, not result
             );
 
         // Mark delivery as completed immediately for local routing

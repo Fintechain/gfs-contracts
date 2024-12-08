@@ -51,6 +51,15 @@ interface ILiquidityPool {
         uint256 amount
     );
 
+    // Events
+    event EmergencyWithdraw(address indexed token, uint256 amount);
+
+    event LiquidityUnlocked(
+        address indexed token,
+        bytes32 indexed settlementId,
+        uint256 amount
+    );
+
     /// @notice Emitted when locked liquidity is released
     event LiquidityReleased(
         address indexed token, 
@@ -64,6 +73,31 @@ interface ILiquidityPool {
         uint256 amount,
         address recipient
     );
+
+    /// @notice Emitted when provider blacklist status is updated
+    event ProviderBlacklistUpdated(
+        address indexed provider,
+        bool blacklisted
+    );
+
+    /// @notice Emitted when permissionless liquidity setting is updated
+    event PermissionlessLiquiditySet(bool enabled);
+
+    /**
+     * @notice Set blacklist status for a liquidity provider
+     * @param provider Address of the provider
+     * @param blacklisted Whether the provider should be blacklisted
+     */
+    function setProviderBlacklist(
+        address provider,
+        bool blacklisted
+    ) external;
+
+    /**
+     * @notice Toggle permissionless liquidity provision
+     * @param _permissionless Whether permissionless liquidity should be enabled
+     */
+    function setPermissionlessLiquidity(bool _permissionless) external;
 
     /**
      * @notice Add liquidity to pool

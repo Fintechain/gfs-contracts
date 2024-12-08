@@ -70,11 +70,11 @@ const func: DeployFunction = async function ({
 
         // 3. Grant PACS008Handler's PROCESSOR_ROLE to the MessageRouter
         await pacs008Handler.connect(adminSigner).grantRole(
-            await pacs008Handler.PROCESSOR_ROLE(), (await get("MessageRouter")).address);
+            await pacs008Handler.PROCESSOR_ROLE(), await messageProcessor.getAddress());
 
         // 4. Add Target route
         const targetRegistry = await hre.ethers.getContractAt("TargetRegistry", (await get("TargetRegistry")).address);
-        
+
         await targetRegistry.connect(adminSigner).registerTarget(
             deployment.address, LOCAL_CHAIN_ID, 0, hre.ethers.toUtf8Bytes("PACS008_HANDLER"));
 
@@ -86,7 +86,7 @@ const func: DeployFunction = async function ({
     console.log("Contract Address:", deployment.address);
 
     console.log("\nDependencies:");
-    console.log("- MockSettlementController:", settlementController.address);
+    console.log("- SettlementController:", settlementController.address);
 
     console.log("\nRole Verification:");
     console.log("- Default Admin Role:", await pacs008Handler.hasRole(await pacs008Handler.DEFAULT_ADMIN_ROLE(), admin));

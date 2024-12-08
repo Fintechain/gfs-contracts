@@ -1,11 +1,11 @@
 import { expect } from "chai";
 import { ethers, deployments, getNamedAccounts } from "hardhat";
-import { LiquidityPool, IERC20 } from "../../../typechain";
+import { LiquidityPool, IERC20, ERC20Mock } from "../../../typechain";
 
 describe("LiquidityPool", function () {
     let liquidityPool: LiquidityPool;
     let mockToken: IERC20;
-    
+
     let settler: string;
     let provider: string;
 
@@ -81,23 +81,23 @@ describe("LiquidityPool", function () {
 
             await expect(liquidityPool.connect(await ethers.getSigner(settler))
                 .createPool(await newToken.getAddress(), minLiquidity, maxLiquidity))
-                .to.be.revertedWith("LiquidityPool: Must have admin role");
+                .to.be.rejectedWith("LiquidityPool: Must have admin role");
         });
     });
 
 
     describe("Liquidity Operations", function () {
         beforeEach(async function () {
-            
+
             // Mint tokens to provider
-            await mockToken.mint(provider, testAmount);
+            await (mockToken as ERC20Mock).mint(provider, testAmount);
             // Approve pool
             await mockToken.connect(await ethers.getSigner(provider))
                 .approve(liquidityPool.getAddress(), testAmount);
         });
 
         it("Should allow provider to add liquidity", async function () {
-            
+
             await expect(liquidityPool.connect(await ethers.getSigner(provider))
                 .addLiquidity(await mockToken.getAddress(), testAmount))
                 .to.emit(liquidityPool, "LiquidityAdded")
@@ -105,7 +105,7 @@ describe("LiquidityPool", function () {
         });
 
         it("Should correctly calculate shares", async function () {
-            
+
             const tx = await liquidityPool.connect(await ethers.getSigner(provider))
                 .addLiquidity(await mockToken.getAddress(), testAmount);
             const receipt = await tx.wait();
@@ -116,7 +116,7 @@ describe("LiquidityPool", function () {
         });
 
         it("Should allow liquidity removal", async function () {
-            
+
             // Add liquidity first
             await liquidityPool.connect(await ethers.getSigner(provider))
                 .addLiquidity(await mockToken.getAddress(), testAmount);
@@ -126,25 +126,25 @@ describe("LiquidityPool", function () {
             await expect(liquidityPool.connect(await ethers.getSigner(provider))
                 .removeLiquidity(await mockToken.getAddress(), removeAmount))
                 .to.emit(liquidityPool, "LiquidityRemoved")
-                //.withArgs(await mockToken.getAddress(), provider, removeAmount);
+            //.withArgs(await mockToken.getAddress(), provider, removeAmount);
         });
 
         it("Should revert if removing more than available", async function () {
-            
+
             await liquidityPool.connect(await ethers.getSigner(provider))
                 .addLiquidity(await mockToken.getAddress(), testAmount);
 
             await expect(liquidityPool.connect(await ethers.getSigner(provider))
                 .removeLiquidity(await mockToken.getAddress(), testAmount * 2n))
-                .to.be.revertedWith("LiquidityPool: Insufficient shares");
+                .to.be.rejectedWith("LiquidityPool: Insufficient shares");
         });
     });
 
     describe("Settlement Operations", function () {
         beforeEach(async function () {
-            
+
             // Add initial liquidity
-            await mockToken.mint(provider, testAmount);
+            await (mockToken as ERC20Mock).mint(provider, testAmount);
             await mockToken.connect(await ethers.getSigner(provider))
                 .approve(liquidityPool.getAddress(), testAmount);
             await liquidityPool.connect(await ethers.getSigner(provider))
@@ -214,10 +214,10 @@ describe("LiquidityPool", function () {
         it("Should prevent operations when paused", async function () {
             const { admin } = await getNamedAccounts();
             await liquidityPool.connect(await ethers.getSigner(admin)).pause();
-            
+
             await expect(liquidityPool.connect(await ethers.getSigner(provider))
                 .addLiquidity(await mockToken.getAddress(), testAmount))
-                .to.be.reverted;
+                .to.be.rejected;
         });
 
         it("Should allow admin to unpause", async function () {
@@ -227,4 +227,163 @@ describe("LiquidityPool", function () {
             expect(await liquidityPool.paused()).to.be.false;
         });
     });
+
+    describe("Permissionless Liquidity Controls", function () {
+        let nonProvider: string;
+
+        beforeEach(async function () {
+            const signers = await ethers.getSigners();
+            nonProvider = signers[4].address; // Account without provider role
+
+            // Mint tokens to non-provider for testing
+            await (mockToken as ERC20Mock).mint(nonProvider, testAmount);
+            await mockToken.connect(await ethers.getSigner(nonProvider))
+                .approve(liquidityPool.getAddress(), testAmount);
+        });
+
+        describe("Permissionless Mode", function () {
+            it("Should only allow admin to set permissionless mode", async function () {
+                const { admin } = await getNamedAccounts();
+
+                // Non-admin attempt should fail
+                await expect(liquidityPool.connect(await ethers.getSigner(provider))
+                    .setPermissionlessLiquidity(true))
+                    .to.be.rejectedWith("LiquidityPool: Must have admin role");
+
+                // Admin should succeed
+                await expect(liquidityPool.connect(await ethers.getSigner(admin))
+                    .setPermissionlessLiquidity(true))
+                    .to.emit(liquidityPool, "PermissionlessLiquiditySet")
+                    .withArgs(true);
+            });
+
+            it("Should allow non-providers to add liquidity when permissionless", async function () {
+                const { admin } = await getNamedAccounts();
+
+                // Enable permissionless mode
+                await liquidityPool.connect(await ethers.getSigner(admin))
+                    .setPermissionlessLiquidity(true);
+
+                // Non-provider should be able to add liquidity
+                await expect(liquidityPool.connect(await ethers.getSigner(nonProvider))
+                    .addLiquidity(await mockToken.getAddress(), testAmount))
+                    .to.emit(liquidityPool, "LiquidityAdded")
+                    .withArgs(await mockToken.getAddress(), nonProvider, testAmount);
+            });
+
+            it("Should prevent non-providers from adding liquidity when not permissionless", async function () {
+                // Without enabling permissionless mode
+                await expect(liquidityPool.connect(await ethers.getSigner(nonProvider))
+                    .addLiquidity(await mockToken.getAddress(), testAmount))
+                    .to.be.rejectedWith("LiquidityPool: Must have provider role");
+            });
+
+            it("Should maintain provider role access when permissionless", async function () {
+                const { admin } = await getNamedAccounts();
+
+                // Enable permissionless mode
+                await liquidityPool.connect(await ethers.getSigner(admin))
+                    .setPermissionlessLiquidity(true);
+
+                await (mockToken as ERC20Mock).mint(provider, testAmount);
+                await mockToken.connect(await ethers.getSigner(provider))
+                    .approve(liquidityPool.getAddress(), testAmount);
+
+                // Provider should still be able to add liquidity
+                await expect(liquidityPool.connect(await ethers.getSigner(provider))
+                    .addLiquidity(await mockToken.getAddress(), testAmount))
+                    .to.emit(liquidityPool, "LiquidityAdded")
+                    .withArgs(await mockToken.getAddress(), provider, testAmount);
+            });
+        });
+
+        describe("Provider Blacklist", function () {
+            it("Should only allow admin to set blacklist status", async function () {
+                const { admin } = await getNamedAccounts();
+
+                // Non-admin attempt should fail
+                await expect(liquidityPool.connect(await ethers.getSigner(provider))
+                    .setProviderBlacklist(nonProvider, true))
+                    .to.be.rejectedWith("LiquidityPool: Must have admin role");
+
+                // Admin should succeed
+                await expect(liquidityPool.connect(await ethers.getSigner(admin))
+                    .setProviderBlacklist(provider, true))
+                    .to.emit(liquidityPool, "ProviderBlacklistUpdated")
+                    .withArgs(provider, true);
+            });
+
+            it("Should prevent blacklisted addresses from adding liquidity", async function () {
+                const { admin } = await getNamedAccounts();
+
+                // Blacklist provider
+                await liquidityPool.connect(await ethers.getSigner(admin))
+                    .setProviderBlacklist(provider, true);
+
+                // Attempt to add liquidity should fail
+                await expect(liquidityPool.connect(await ethers.getSigner(provider))
+                    .addLiquidity(await mockToken.getAddress(), testAmount))
+                    .to.be.rejectedWith("Provider is blacklisted");
+            });
+
+            it("Should allow removing addresses from blacklist", async function () {
+                const { admin } = await getNamedAccounts();
+
+                // First blacklist
+                await liquidityPool.connect(await ethers.getSigner(admin))
+                    .setProviderBlacklist(provider, true);
+
+                // Then remove from blacklist
+                await expect(liquidityPool.connect(await ethers.getSigner(admin))
+                    .setProviderBlacklist(provider, false))
+                    .to.emit(liquidityPool, "ProviderBlacklistUpdated")
+                    .withArgs(provider, false);
+
+                await (mockToken as ERC20Mock).mint(provider, testAmount);
+                await mockToken.connect(await ethers.getSigner(provider))
+                    .approve(liquidityPool.getAddress(), testAmount);
+
+                // Should be able to add liquidity again
+                await expect(liquidityPool.connect(await ethers.getSigner(provider))
+                    .addLiquidity(await mockToken.getAddress(), testAmount))
+                    .to.emit(liquidityPool, "LiquidityAdded")
+                    .withArgs(await mockToken.getAddress(), provider, testAmount);
+            });
+
+            it("Should maintain blacklist when toggling permissionless mode", async function () {
+                const { admin } = await getNamedAccounts();
+
+                // Blacklist provider
+                await liquidityPool.connect(await ethers.getSigner(admin))
+                    .setProviderBlacklist(provider, true);
+
+                // Enable permissionless mode
+                await liquidityPool.connect(await ethers.getSigner(admin))
+                    .setPermissionlessLiquidity(true);
+
+                // Provider should still be blocked
+                await expect(liquidityPool.connect(await ethers.getSigner(provider))
+                    .addLiquidity(await mockToken.getAddress(), testAmount))
+                    .to.be.rejectedWith("Provider is blacklisted");
+            });
+
+            it("Should allow blacklisting in permissionless mode", async function () {
+                const { admin } = await getNamedAccounts();
+
+                // Enable permissionless mode first
+                await liquidityPool.connect(await ethers.getSigner(admin))
+                    .setPermissionlessLiquidity(true);
+
+                // Blacklist non-provider
+                await liquidityPool.connect(await ethers.getSigner(admin))
+                    .setProviderBlacklist(nonProvider, true);
+
+                // Attempt to add liquidity should fail
+                await expect(liquidityPool.connect(await ethers.getSigner(nonProvider))
+                    .addLiquidity(await mockToken.getAddress(), testAmount))
+                    .to.be.rejectedWith("Provider is blacklisted");
+            });
+        });
+    });
+
 });

@@ -9,6 +9,10 @@
  * - Use these utilities to verify the mode or fetch the active deployment mode.
  */
 
+import { BaseContract, Contract } from "ethers";
+import { string } from "hardhat/internal/core/params/argumentTypes";
+import { HardhatRuntimeEnvironment } from "hardhat/types";
+
 export type DeploymentMode = "unit" | "integration" | "production";
 
 /**
@@ -82,4 +86,19 @@ export function isProductionMode(): boolean {
  */
 export function logDeploymentMode(): void {
   console.info(`Current deployment mode: ${getDeploymentMode()}`);
+}
+
+/**
+ * 
+ * @param name 
+ * @param hre 
+ * @returns 
+ */
+export async function getDeployedContract(name: string, hre: HardhatRuntimeEnvironment): Promise<BaseContract> {
+  const { deployments } = hre;
+  const { get } = deployments;
+  
+  const contractDeployment = (await get(name));
+  const contract = await hre.ethers.getContractAt(name, contractDeployment.address);
+  return contract
 }

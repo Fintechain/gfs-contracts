@@ -66,6 +66,7 @@ const config: HardhatUserConfig = {
             saveDeployments: true,
             tags: ["local", "test"],
             loggingEnabled: true,
+            timeout: 60000  // increase timeout to 60 seconds
             //            gasLimit: 12000000,
         },
         sepolia: {

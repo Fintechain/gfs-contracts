@@ -83,6 +83,7 @@ contract PACS008Handler is IMessageHandler, AccessControl, Pausable, ReentrancyG
         require(hasRole(PROCESSOR_ROLE, msg.sender), "Unauthorized processor");
         require(!processedMessages[messageId], "Message already processed");
 
+
         // Validate and decode payload
         PACS008Payload memory creditTransfer = _decodeAndValidatePayload(payload);
 

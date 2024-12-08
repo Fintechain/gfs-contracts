@@ -185,7 +185,7 @@ contract ProtocolCoordinator is
             submission.payload.length
         );
 
-        require(msg.value >= _deliveryFee, "Insufficient fee");
+        require(msg.value >= _deliveryFee, "Insufficient feex");
 
         messageRouter.routeMessage{value: _deliveryFee}(
             messageId,

@@ -8,6 +8,9 @@ import "../interfaces/ILiquidityPool.sol";
  * @notice Mock implementation of ILiquidityPool for testing
  */
 contract MockLiquidityPool is ILiquidityPool {
+    bool public permissionlessMode;
+    mapping(address => bool) public blacklistedProviders;
+
     function addLiquidity(
         address token,
         uint256 amount
@@ -52,5 +55,33 @@ contract MockLiquidityPool is ILiquidityPool {
         address token
     ) external pure override returns (PoolInfo memory) {
         return PoolInfo(0, 0, 0, 0, 0, true);
+    }
+
+    function setPermissionlessLiquidity(bool enabled) external override {
+        permissionlessMode = enabled;
+        emit PermissionlessLiquiditySet(enabled);
+    }
+
+    function setProviderBlacklist(address provider, bool blacklisted) external override {
+        blacklistedProviders[provider] = blacklisted;
+        emit ProviderBlacklistUpdated(provider, blacklisted);
+    }
+
+    // Helper functions for testing
+    function isPermissionlessEnabled() external view returns (bool) {
+        return permissionlessMode;
+    }
+
+    function isBlacklisted(address provider) external view returns (bool) {
+        return blacklistedProviders[provider];
+    }
+
+    // Mock functions to simulate failures for testing
+    function mockSetBlacklistRevert() external pure {
+        revert("MockLiquidityPool: Blacklist operation failed");
+    }
+
+    function mockSetPermissionlessRevert() external pure {
+        revert("MockLiquidityPool: Permissionless setting failed");
     }
 }
