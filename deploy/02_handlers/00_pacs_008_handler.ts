@@ -1,11 +1,11 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { MARKET_NAME, COMMON_DEPLOY_PARAMS } from "../../src/env";
-import { isProductionMarket, isTestnetMarket, loadProtocolConfig } from "../../src/market-config-helpers";
-import { MESSAGE_TYPE_PACS008, PACS008_REQUIRED_FIELDS } from "../../src/types/";
+import { isProductionMarket, isTestnetMarket, loadProtocolConfig } from "../../src/utils/config-helpers";
+import { MESSAGE_TYPE_PACS008, PACS008_REQUIRED_FIELDS } from "../../src/types";
 import { SettlementController } from "../../typechain";
 import { network } from "hardhat";
-import { isUnitMode } from "../../src/utils/deploy-helper";
+import { isUnitMode } from "../../src/utils/deploy-utils";
 import { LOCAL_CHAIN_ID } from "../../src/constants";
 
 const func: DeployFunction = async function ({

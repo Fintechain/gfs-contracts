@@ -1,10 +1,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
-import { LOG_DEPLOYMENTS } from "../../src/";
-import { isTestnetMarket, loadProtocolConfig } from "../../src/market-config-helpers";
-import { COMMON_DEPLOY_PARAMS, MARKET_NAME } from "./../../src/env";
-import { network } from "hardhat";
-import { isUnitMode } from "../../src/utils/deploy-helper";
+import { COMMON_DEPLOY_PARAMS } from "../../src/env";
+import { ERC20Token } from "../../typechain";
 
 const func: DeployFunction = async function ({
     getNamedAccounts,
@@ -18,24 +15,6 @@ const func: DeployFunction = async function ({
     const pauser = admin;
     const minter = admin;
     const upgrader = admin;
-
-    if (isUnitMode()) {
-        await deploy("MockERC20Token", {
-            from: admin,
-            contract: "MockERC20Token",
-            args: ["Mock Token", "MOCK"],
-            ...COMMON_DEPLOY_PARAMS
-        });
-
-
-        await deploy("MockTargetToken", {
-            from: admin,
-            contract: "MockERC20Token",
-            args: ["Mock Target Token", "MTT"],
-            ...COMMON_DEPLOY_PARAMS
-        });
-    }
-
 
     // Your existing deployment code
     const eRC20TokenArtifact = await deploy("ERC20Token", {
@@ -64,16 +43,16 @@ const func: DeployFunction = async function ({
     const amountToMint = hre.ethers.parseUnits("1000000", 18);
     console.log("Minting initial supply...");
 
-    const mintTx = await tokenWithMinter.mint(admin, amountToMint);
-    await mintTx.wait();
+    const mintTx = await (tokenWithMinter as ERC20Token).mint(admin, amountToMint);
+    //await mintTx.wait();
 
     console.log(`Minted ${hre.ethers.formatUnits(amountToMint, 18)} tokens to ${admin}`);
 
     // Verify balance
-    const balance = await token.balanceOf(admin);
+    const balance = await (token as ERC20Token).balanceOf(admin);
     console.log(`Initial supply: ${hre.ethers.formatUnits(balance, 18)} GFSUSD`);
 
-    const liquidStakingTokenImplArtifact = await deploy("LiquidStakingToken", {
+    deploy("LiquidStakingToken", {
         from: admin,
         proxy: {
             proxyContract: "OpenZeppelinTransparentProxy",
@@ -87,7 +66,7 @@ const func: DeployFunction = async function ({
         ...COMMON_DEPLOY_PARAMS
     });
 
-    const governanceTokenArtifact = await deploy("GovernanceToken", {
+    await deploy("GovernanceToken", {
         from: admin,
         proxy: {
             proxyContract: "OpenZeppelinTransparentProxy",

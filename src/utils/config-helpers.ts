@@ -1,7 +1,7 @@
-import { iParamsPerNetwork, eNetwork, tEthereumAddress, ProtocolConfiguration, ICommonConfiguration } from "./types";
-import { isValidAddress } from "./utils/utils";
-import EthereumV1Market from "./markets/ethereum";
-import EthereumV1TestnetMarket from "./markets/test";
+import { iParamsPerNetwork, eNetwork, tEthereumAddress, ProtocolConfiguration, ICommonConfiguration } from "../types";
+import { isValidAddress } from "./utils";
+import EthereumV1Market from "../config/ethereum";
+import EthereumV1TestnetMarket from "../config/test";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 declare var hre: HardhatRuntimeEnvironment;

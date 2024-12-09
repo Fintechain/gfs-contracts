@@ -1,4 +1,4 @@
-import { ConfigNames } from "./market-config-helpers";
+import { ConfigNames } from "./utils/config-helpers";
 
 export const MARKET_NAME =
   (process.env.MARKET_NAME as ConfigNames) || ConfigNames.Commons;

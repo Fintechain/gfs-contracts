@@ -1,4 +1,4 @@
-import { getParamPerNetwork } from "../market-config-helpers";
+import { getParamPerNetwork } from "./config-helpers";
 import { eNetwork, eEthereumNetwork } from "../types";
 
 // Get network-specific Wormhole contract addresses

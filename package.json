@@ -3,18 +3,16 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "scripts": { 
+  "scripts": {
     "clean": "npx hardhat clean",
     "compile": "npx hardhat compile",
     "typechain": "npx hardhat typechain",
     "node": "DEPLOY_MODE=integration npx hardhat node",
-
     "deploy:hardhat": "DEPLOY_MODE=integration npx hardhat deploy --reset --network hardhat",
     "deploy:localhost": "DEPLOY_MODE=integration npx hardhat deploy --reset --network localhost",
     "deploy:ganache": "DEPLOY_MODE=integration npx hardhat deploy --reset --network ganache",
     "deploy:sepolia": "DEPLOY_MODE=integration npx hardhat deploy --network sepolia",
     "deploy:holesky": "DEPLOY_MODE=integration npx hardhat deploy --network holesky",
-
     "test:unit": "DEPLOY_MODE=unit npx hardhat test test/unit/**/* --network hardhat",
     "test:integration": "DEPLOY_MODE=integration npx hardhat test test/integration/**/* --network hardhat",
     "test:localhost:integration": "DEPLOY_MODE=integration npx hardhat test test/integration/**/* --network localhost",
@@ -32,7 +30,7 @@
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.7",
     "@nomicfoundation/hardhat-ethers": "^3.0.6",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
-    "@openzeppelin/hardhat-upgrades": "^3.2.0",
+    "@openzeppelin/hardhat-upgrades": "^3.7.0",
     "@typechain/ethers-v6": "^0.5.1",
     "@typechain/hardhat": "^9.1.0",
     "dotenv": "^16.4.5",

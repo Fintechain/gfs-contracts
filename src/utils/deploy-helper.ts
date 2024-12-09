@@ -1,104 +1,96 @@
-/**
- * Utility functions to manage and verify deployment modes in a Hardhat project.
- * 
- * Deployment modes determine which contracts are deployed and tested, 
- * allowing separation of logic between `unit`, `integration`, and `production` environments.
- * 
- * Usage:
- * - Set the `DEPLOY_MODE` environment variable to `unit`, `integration`, or `production`.
- * - Use these utilities to verify the mode or fetch the active deployment mode.
- */
-
-import { BaseContract, Contract } from "ethers";
-import { string } from "hardhat/internal/core/params/argumentTypes";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-
-export type DeploymentMode = "unit" | "integration" | "production";
-
-/**
- * Valid deployment modes.
- */
-const VALID_DEPLOYMENT_MODES: DeploymentMode[] = ["unit", "integration", "production"];
+import { BaseContract } from "ethers";
+import { ContractNameToVariant } from "../types/deployment";
+import { isUnitMode } from "./deploy-utils";
 
 /**
- * Retrieves the current deployment mode from the environment variable.
- * Defaults to "unit" if not explicitly set.
- *
- * @returns {DeploymentMode} The active deployment mode.
- * @throws {Error} If the deployment mode is invalid or not supported.
+ * Helper class for managing contract deployments and retrieving deployed instances
  */
-export function getDeploymentMode(): DeploymentMode {
-  const deployMode = process.env.DEPLOY_MODE as DeploymentMode | undefined;
+export class DeploymentHelper {
+    private readonly hre: HardhatRuntimeEnvironment;
 
-  if (!deployMode) {
-    console.warn("DEPLOY_MODE not set. Defaulting to 'unit'.");
-    return "unit";
-  }
+    /**
+     * Creates a new DeploymentHelper instance
+     * @param hre Hardhat Runtime Environment
+     */
+    constructor(hre: HardhatRuntimeEnvironment) {
+        this.hre = hre;
+    }
 
-  if (!VALID_DEPLOYMENT_MODES.includes(deployMode)) {
-    throw new Error(
-      `Invalid DEPLOY_MODE: "${deployMode}". Valid options are ${VALID_DEPLOYMENT_MODES.join(", ")}.`
+    /**
+     * Retrieves a deployed contract by name
+     * @param name The contract name
+     * @returns Deployed contract instance
+     * @throws Error if contract deployment is not found
+     * 
+     * @example
+     * const helper = new DeploymentHelper(hre);
+     * const contract = await helper.getDeployedContract("TokenContract");
+     */
+    async getDeployedContract(name: string): Promise<BaseContract> {
+        const { deployments } = this.hre;
+        const { get } = deployments;
+        
+        const contractDeployment = await get(name);
+        return await this.hre.ethers.getContractAt(name, contractDeployment.address);
+    }
+
+    /**
+     * Retrieves a deployed contract instance with proper typing and variant handling
+     * @template T The contract type from typechain
+     * @param variant Contract variant (mock/real) definition
+     * @returns Typed contract instance
+     * @throws Error if contract deployment is not found
+     * 
+     * @example
+     * const helper = new DeploymentHelper(hre);
+     * const registry = await helper.getContractVariantInstance<TargetRegistry>(
+     *     CONTRACT_VARIANTS.TargetRegistry
+     * );
+     */
+    async getContractVariantInstance<T extends BaseContract>(
+        variant: ContractNameToVariant<string>
+    ): Promise<T> {
+        const contractName = isUnitMode() ? variant.mock : variant.real;
+        const deployment = await this.hre.deployments.get(contractName);
+        const contract = await this.hre.ethers.getContractAt(contractName, deployment.address);
+        
+        return contract as unknown as T;
+    }
+
+    /**
+     * Gets a typed contract instance
+     * @template T The contract type from typechain
+     * @param name Contract name
+     * @returns Typed contract instance
+     * 
+     * @example
+     * const helper = new DeploymentHelper(hre);
+     * const token = await helper.getContract<ERC20>("TokenContract");
+     */
+    async getContract<T extends BaseContract>(name: string): Promise<T> {
+        const contract = await this.getDeployedContract(name);
+        return contract as unknown as T;
+    }
+}
+
+// Usage example:
+/*
+import { TargetRegistry, ERC20 } from '../typechain-types';
+import { CONTRACT_VARIANTS } from './registry';
+
+async function example(hre: HardhatRuntimeEnvironment) {
+    const helper = new DeploymentHelper(hre);
+
+    // Get typed contract variant
+    const registry = await helper.getContractVariantInstance<TargetRegistry>(
+        CONTRACT_VARIANTS.TargetRegistry
     );
-  }
 
-  return deployMode;
-}
+    // Get regular contract with type
+    const token = await helper.getContract<ERC20>("TokenContract");
 
-/**
- * Verifies if the current deployment mode matches the specified mode.
- *
- * @param {DeploymentMode} mode - The mode to verify against.
- * @returns {boolean} True if the current mode matches the specified mode, otherwise false.
- */
-export function isDeploymentMode(mode: DeploymentMode): boolean {
-  return getDeploymentMode() === mode;
+    // Get untyped contract
+    const genericContract = await helper.getDeployedContract("SomeContract");
 }
-
-/**
- * Utility to check if the current deployment mode is "unit".
- *
- * @returns {boolean} True if the deployment mode is "unit".
- */
-export function isUnitMode(): boolean {
-  return isDeploymentMode("unit");
-}
-
-/**
- * Utility to check if the current deployment mode is "integration".
- *
- * @returns {boolean} True if the deployment mode is "integration".
- */
-export function isIntegrationMode(): boolean {
-  return isDeploymentMode("integration");
-}
-
-/**
- * Utility to check if the current deployment mode is "production".
- *
- * @returns {boolean} True if the deployment mode is "production".
- */
-export function isProductionMode(): boolean {
-  return isDeploymentMode("production");
-}
-
-/**
- * Logs the current deployment mode to the console for debugging purposes.
- */
-export function logDeploymentMode(): void {
-  console.info(`Current deployment mode: ${getDeploymentMode()}`);
-}
-
-/**
- * 
- * @param name 
- * @param hre 
- * @returns 
- */
-export async function getDeployedContract(name: string, hre: HardhatRuntimeEnvironment): Promise<BaseContract> {
-  const { deployments } = hre;
-  const { get } = deployments;
-  
-  const contractDeployment = (await get(name));
-  const contract = await hre.ethers.getContractAt(name, contractDeployment.address);
-  return contract
-}
+*/

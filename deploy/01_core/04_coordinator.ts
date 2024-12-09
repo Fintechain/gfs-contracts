@@ -2,7 +2,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { ProtocolCoordinator } from "../../typechain";
 import { COMMON_DEPLOY_PARAMS, MARKET_NAME } from "../../src/env";
-import { isUnitMode } from "../../src/utils/deploy-helper";
+import { isUnitMode } from "../../src/utils/deploy-utils";
 
 const func: DeployFunction = async function ({
     getNamedAccounts,

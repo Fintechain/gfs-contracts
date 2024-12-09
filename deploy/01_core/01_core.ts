@@ -1,9 +1,6 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { COMMON_DEPLOY_PARAMS, MARKET_NAME } from "../../src/env";
-import { isTestnetMarket, loadProtocolConfig } from "../../src/market-config-helpers";
-import { network } from "hardhat";
-import { isUnitMode } from "../../src/utils/deploy-helper";
 
 const func: DeployFunction = async function ({
     getNamedAccounts,
@@ -13,16 +10,17 @@ const func: DeployFunction = async function ({
     const { deploy } = deployments;
     const { admin } = await getNamedAccounts();
 
-    if (isUnitMode()) {
-        await deploy("MockMessageRegistry", { from: admin, args: [], ...COMMON_DEPLOY_PARAMS });
-    }
-
+    await deploy("TargetRegistry", { from: admin, args: [], log: true });
+    await deploy("MessageProcessor", { from: admin, args: [], log: true });
+    await deploy("LiquidityPool", { from: admin, args: [], ...COMMON_DEPLOY_PARAMS });
     await deploy("MessageRegistry", { from: admin, args: [], ...COMMON_DEPLOY_PARAMS });
+    await deploy("MessageProtocol", { from: admin, args: [], ...COMMON_DEPLOY_PARAMS });
+    await deploy("ProtocolGovernance", { from: admin, args: [], ...COMMON_DEPLOY_PARAMS });
 
     return true;
 };
 
-func.id = "MessageRegistry";
-func.tags = ["core", "MessageRegistry"];
+func.id = "Core";
+func.tags = ["core", "Core"];
 
 export default func;
