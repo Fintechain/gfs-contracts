@@ -1,4 +1,5 @@
 import { iParamsPerNetwork, SymbolMap, tEthereumAddress } from "./base";
+import { TxConfigPerNetwork } from "./transaction";
 
 export interface IBaseConfiguration {
     MarketId: string;
@@ -13,7 +14,6 @@ export interface IBaseConfiguration {
 
 export interface ICommonConfiguration extends IBaseConfiguration {}
 
-export interface IGFSConfiguration extends ICommonConfiguration {
-}
-
-export type ProtocolConfiguration = ICommonConfiguration;
+export type ProtocolConfiguration = ICommonConfiguration & {
+    TransactionConfig: TxConfigPerNetwork;
+};

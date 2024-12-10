@@ -40,7 +40,8 @@ export enum eEthereumNetwork {
     coverage = "coverage",
     hardhat = "hardhat",
     sepolia = "sepolia",
-    holesky = "holesky"
+    holesky = "holesky",
+    ganache = "ganache",
 }
 
 export enum eBaseNetwork {

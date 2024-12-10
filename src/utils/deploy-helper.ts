@@ -1,20 +1,39 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { BaseContract } from "ethers";
+import { BaseContract, TransactionReceipt, TransactionResponse } from "ethers";
 import { ContractNameToVariant } from "../types/deployment";
 import { isUnitMode } from "./deploy-utils";
+import { TransactionService } from "../service/transaction";
+import { ProtocolConfiguration } from "../types";
 
 /**
  * Helper class for managing contract deployments and retrieving deployed instances
  */
 export class DeploymentHelper {
+    private readonly config: ProtocolConfiguration;
     private readonly hre: HardhatRuntimeEnvironment;
+    private readonly txService: TransactionService;
+
+    constructor(hre: HardhatRuntimeEnvironment, config: ProtocolConfiguration) {
+        this.hre = hre;
+        this.config = config;
+        this.txService = new TransactionService(hre, config.TransactionConfig);
+    }
 
     /**
-     * Creates a new DeploymentHelper instance
-     * @param hre Hardhat Runtime Environment
+     * Waits for a transaction to be confirmed
+     * Delegates to TransactionService with appropriate network configuration
+     * 
+     * @param tx Transaction to wait for
+     * @returns Transaction receipt
+     * @throws Error if transaction fails or times out
+     * 
+     * @example
+     * const helper = new DeploymentHelper(hre);
+     * const tx = await contract.someMethod();
+     * const receipt = await helper.waitForTx(tx);
      */
-    constructor(hre: HardhatRuntimeEnvironment) {
-        this.hre = hre;
+    async waitForTx(tx: TransactionResponse): Promise<TransactionReceipt> {
+        return this.txService.waitForTx(tx);
     }
 
     /**

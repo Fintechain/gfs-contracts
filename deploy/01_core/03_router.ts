@@ -1,7 +1,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { COMMON_DEPLOY_PARAMS, MARKET_NAME } from "../../src/env";
-import { loadProtocolConfig } from "../../src/utils/config-helpers";
+import { ConfigNames, getProtocolConfig, loadProtocolConfig } from "../../src/utils/config-helpers";
 import { getContractVariantInstance, isUnitMode } from "../../src/utils/deploy-utils";
 import { eEthereumNetwork, eNetwork } from "../../src/types";
 import { getWormholeAddresses } from "../../src/utils/wormhole-helper";
@@ -17,7 +17,8 @@ const func: DeployFunction = async function ({
 }: HardhatRuntimeEnvironment) {
     const { deploy, get, log } = deployments;
     const { admin } = await getNamedAccounts();
-    const config = loadProtocolConfig(MARKET_NAME);
+    //const config = loadProtocolConfig(MARKET_NAME);
+    const config = getProtocolConfig();
     const adminSigner = await hre.ethers.getSigner(admin);
     const environment = { getNamedAccounts, deployments, ...hre };
 
@@ -27,14 +28,10 @@ const func: DeployFunction = async function ({
 
     var { wormholeRelayer, wormhole } = getWormholeAddresses(network, config);
 
-    // Initialize helper once
-    const helper = new DeploymentHelper(environment);
+    // Initialize helper with protocol config
+    const helper = new DeploymentHelper(environment, getProtocolConfig());
 
     // Get contract instances using helper
-    const registry = await helper.getContractVariantInstance<TargetRegistry>(
-        CONTRACT_VARIANTS.TargetRegistry
-    );
-
     const targetRegistry = await helper.getContractVariantInstance<TargetRegistry>(
         CONTRACT_VARIANTS.TargetRegistry
     );
@@ -60,13 +57,15 @@ const func: DeployFunction = async function ({
 
     if (!isUnitMode()) {
         // 1. Grant MessageProcessor's PROCESSOR_ROLE to the MessageRouter contract
-        await messageProcessor.connect(
-            adminSigner).grantRole(await messageProcessor.PROCESSOR_ROLE(), deployment.address);
-
-
+        await helper.waitForTx(
+            await messageProcessor.connect(
+                adminSigner).grantRole(await messageProcessor.PROCESSOR_ROLE(), deployment.address)
+        );
         // 2. Grant TargetRegistry's VALIDATOR_ROLE to the MessageRouter contract
-        await targetRegistry.connect(
-            adminSigner).grantRole(await targetRegistry.VALIDATOR_ROLE(), deployment.address);
+        await helper.waitForTx(
+            await targetRegistry.connect(
+                adminSigner).grantRole(await targetRegistry.VALIDATOR_ROLE(), deployment.address)
+        );
 
         console.log("MessageRouter has PROCESSOR_ROLE in MessageProcessor:",
             await messageProcessor.hasRole(await messageProcessor.PROCESSOR_ROLE(), deployment.address)
@@ -87,16 +86,8 @@ const func: DeployFunction = async function ({
     console.log("- TargetRegistry:", targetRegistryAddr);
     console.log("- MessageProcessor:", messageProcessorAddr);
     console.log("\nDeployer:", admin);
-    console.log("=======================================\n");
+    console.log("===============================================\n");
 
-    if (!isUnitMode()) {
-        // 1. Grant MessageProcessor's PROCESSOR_ROLE to the MessageRouter contract
-        const messageProcessorContract = await hre.ethers.getContractAt("MessageProcessor", messageProcessorAddr);
-
-
-
-
-    }
 
     return true;
 };

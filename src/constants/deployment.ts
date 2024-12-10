@@ -23,6 +23,10 @@ export const CONTRACT_VARIANTS = {
     TargetRegistry: createVariant("TargetRegistry"),
     MessageProcessor: createVariant("MessageProcessor"),
     LiquidityPool: createVariant("LiquidityPool"),
+    MessageRouter: createVariant("MessageRouter"),
+    MessageRegistry: createVariant("MessageRegistry"),
+    MessageProtocol: createVariant("MessageProtocol"),
+    SettlementController: createVariant("SettlementController"),
     
     // Token Contracts
     WETH: createVariant("WETH"),

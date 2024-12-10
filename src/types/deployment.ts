@@ -1,8 +1,3 @@
-// types/contracts.ts
-
-import { BaseContract } from "ethers";
-import { HardhatRuntimeEnvironment } from "hardhat/types";
-
 export interface ContractVariant {
     mock: string;
     real: string;

@@ -2,6 +2,8 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { COMMON_DEPLOY_PARAMS } from "../../src/env";
 import { ERC20Token } from "../../typechain";
+import { DeploymentHelper } from "../../src/utils/deploy-helper";
+import { getProtocolConfig } from "../../src/utils/config-helpers";
 
 const func: DeployFunction = async function ({
     getNamedAccounts,
@@ -10,13 +12,17 @@ const func: DeployFunction = async function ({
 }: HardhatRuntimeEnvironment) {
     const { deploy } = deployments;
     const { admin } = await getNamedAccounts();
+    const environment = { getNamedAccounts, deployments, ...hre };
 
-    const defaultAdmin = admin; 
+    // Initialize helper with protocol config
+    const helper = new DeploymentHelper(environment, getProtocolConfig());
+
+    const defaultAdmin = admin;
     const pauser = admin;
     const minter = admin;
     const upgrader = admin;
 
-    // Your existing deployment code
+    // Deploy ERC20Token
     const eRC20TokenArtifact = await deploy("ERC20Token", {
         from: admin,
         proxy: {
@@ -31,28 +37,8 @@ const func: DeployFunction = async function ({
         ...COMMON_DEPLOY_PARAMS
     });
 
-    // Get contract instance at proxy address
-    const ERC20Token = await hre.ethers.getContractFactory("ERC20Token");
-    const token = await ERC20Token.attach(eRC20TokenArtifact.address);
-
-    // Get minter signer and connect to contract
-    const minterSigner = await hre.ethers.getSigner(minter);
-    const tokenWithMinter = token.connect(minterSigner);
-
-    // Mint initial supply
-    const amountToMint = hre.ethers.parseUnits("1000000", 18);
-    console.log("Minting initial supply...");
-
-    const mintTx = await (tokenWithMinter as ERC20Token).mint(admin, amountToMint);
-    //await mintTx.wait();
-
-    console.log(`Minted ${hre.ethers.formatUnits(amountToMint, 18)} tokens to ${admin}`);
-
-    // Verify balance
-    const balance = await (token as ERC20Token).balanceOf(admin);
-    console.log(`Initial supply: ${hre.ethers.formatUnits(balance, 18)} GFSUSD`);
-
-    deploy("LiquidStakingToken", {
+    // Deploy LiquidStakingToken
+    await deploy("LiquidStakingToken", {
         from: admin,
         proxy: {
             proxyContract: "OpenZeppelinTransparentProxy",
@@ -66,6 +52,7 @@ const func: DeployFunction = async function ({
         ...COMMON_DEPLOY_PARAMS
     });
 
+    // Deploy GovernanceToken
     await deploy("GovernanceToken", {
         from: admin,
         proxy: {
@@ -79,6 +66,25 @@ const func: DeployFunction = async function ({
         },
         ...COMMON_DEPLOY_PARAMS
     });
+
+    const minterSigner = await hre.ethers.getSigner(minter);
+    const amountToMint = hre.ethers.parseUnits("1000000", 18);
+
+    // Get deployed token
+    const token = await helper.getContract<ERC20Token>("ERC20Token");
+
+    console.log("Minting initial supply...");
+
+    await helper.waitForTx(
+        await token.connect(minterSigner).mint(admin, amountToMint)
+    );
+
+    console.log(`Minted ${hre.ethers.formatUnits(amountToMint, 18)} tokens to ${admin}`);
+
+    // Verify balance
+    const balance = await (token as ERC20Token).balanceOf(admin);
+
+    console.log(`Initial supply: ${hre.ethers.formatUnits(balance, 18)} ${await token.symbol()}`);
 
     return true;
 };

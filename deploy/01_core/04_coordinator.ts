@@ -1,8 +1,11 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
-import { ProtocolCoordinator } from "../../typechain";
+import { MessageProcessor, MessageProtocol, MessageRegistry, MessageRouter, ProtocolCoordinator } from "../../typechain";
 import { COMMON_DEPLOY_PARAMS, MARKET_NAME } from "../../src/env";
 import { isUnitMode } from "../../src/utils/deploy-utils";
+import { CONTRACT_VARIANTS } from "../../src/constants/deployment";
+import { DeploymentHelper } from "../../src/utils/deploy-helper";
+import { ConfigNames, getProtocolConfig, loadProtocolConfig } from "../../src/utils/config-helpers";
 
 const func: DeployFunction = async function ({
     getNamedAccounts,
@@ -12,35 +15,43 @@ const func: DeployFunction = async function ({
     const { deploy, get } = deployments;
     const { admin } = await getNamedAccounts();
     const adminSigner = await hre.ethers.getSigner(admin);
+    const environment = { getNamedAccounts, deployments, ...hre };
 
-    var messageRouter;
-    var messageRegistry;
-    var messageProtocol;
-    var messageProcessor;
+    // Initialize helper with protocol config
+    const helper = new DeploymentHelper(environment, getProtocolConfig());
 
-    // For integration tests, always use real contracts
-    if (isUnitMode()) {
-        messageRouter = (await get("MockMessageRouter")).address;
-        messageRegistry = (await get("MockMessageRegistry")).address;
-        messageProtocol = (await get("MockMessageProtocol")).address;
-        messageProcessor = (await get("MockMessageProcessor")).address;
-    }
-    else {
-        // Use real contracts for mainnet or integration tests
-        messageRouter = (await get("MessageRouter")).address;
-        messageRegistry = (await get("MessageRegistry")).address;
-        messageProtocol = (await get("MessageProtocol")).address;
-        messageProcessor = (await get("MessageProcessor")).address;
-    }
+    // Define all message contracts
+    const contracts = {
+        messageRouter: await helper.getContractVariantInstance<MessageRouter>(
+            CONTRACT_VARIANTS.MessageRouter
+        ),
+        messageRegistry: await helper.getContractVariantInstance<MessageRegistry>(
+            CONTRACT_VARIANTS.MessageRegistry
+        ),
+        messageProtocol: await helper.getContractVariantInstance<MessageProtocol>(
+            CONTRACT_VARIANTS.MessageProtocol
+        ),
+        messageProcessor: await helper.getContractVariantInstance<MessageProcessor>(
+            CONTRACT_VARIANTS.MessageProcessor
+        )
+    };
+
+    // Get addresses
+    const addresses = {
+        messageRouter: await contracts.messageRouter.getAddress(),
+        messageRegistry: await contracts.messageRegistry.getAddress(),
+        messageProtocol: await contracts.messageProtocol.getAddress(),
+        messageProcessor: await contracts.messageProcessor.getAddress()
+    };
 
     // Deploy ProtocolCoordinator
     const deployment = await deploy("ProtocolCoordinator", {
         from: admin,
         args: [
-            messageRegistry,
-            messageProtocol,
-            messageRouter,
-            messageProcessor,
+            addresses.messageRegistry,
+            addresses.messageProtocol,
+            addresses.messageRouter,
+            addresses.messageProcessor,
         ],
         ...COMMON_DEPLOY_PARAMS
     });
@@ -58,39 +69,50 @@ const func: DeployFunction = async function ({
             deployment.address
         );
 
-        // 1. Grant MessageProtocol's VALIDATOR_ROLE to the ProtocolCoordinator contract
-        const messageProtocolContract = await hre.ethers.getContractAt("MessageProtocol", messageProtocol);
-        await messageProtocolContract.connect(
-            adminSigner).grantRole(await messageProtocolContract.VALIDATOR_ROLE(), deployment.address);
+        // First fetch all required roles
 
+        // 1. Grant MessageProtocol's VALIDATOR_ROLE to the ProtocolCoordinator contract
+
+        await helper.waitForTx(
+            await contracts.messageProtocol.connect(adminSigner)
+                .grantRole(await contracts.messageProtocol.VALIDATOR_ROLE(), deployment.address)
+        );
 
         // 2. Grant MessageRegistry's REGISTRAR_ROLE and PROCESSOR_ROLE roles to the ProtocolCoordinator contract
-        const messageRegistryContract = await hre.ethers.getContractAt("MessageRegistry", messageRegistry);
-        await messageRegistryContract.connect(
-            adminSigner).grantRole(await messageRegistryContract.REGISTRAR_ROLE(), deployment.address);
+        await helper.waitForTx(
+            await contracts.messageRegistry.connect(adminSigner)
+                .grantRole(await contracts.messageRegistry.REGISTRAR_ROLE(), deployment.address)
+        );
 
-        await messageRegistryContract.connect(
-            adminSigner).grantRole(await messageRegistryContract.PROCESSOR_ROLE(), deployment.address);
+        await helper.waitForTx(
+            await contracts.messageRegistry.connect(adminSigner)
+                .grantRole(await contracts.messageRegistry.PROCESSOR_ROLE(), deployment.address)
+        );
 
         // 3. Grant MessageRouter's ROUTER_ROLE to the ProtocolCoordinator contract
-        const messageRouterContract = await hre.ethers.getContractAt("MessageRouter", messageRouter);
-        await messageRouterContract.connect(
-            adminSigner).grantRole(await messageRouterContract.ROUTER_ROLE(), deployment.address);
-
+        await helper.waitForTx(
+            await contracts.messageRouter.connect(adminSigner)
+                .grantRole(await contracts.messageRouter.ROUTER_ROLE(), deployment.address)
+        );
 
         // 4. Grant MessageProcessor's PROCESSOR_ROLE to the ProtocolCoordinator contract
-        const messageProcessorContract = await hre.ethers.getContractAt("MessageProcessor", messageProcessor);
-        await messageProcessorContract.connect(
-            adminSigner).grantRole(await messageProcessorContract.PROCESSOR_ROLE(), deployment.address);
+        await helper.waitForTx(
+            await contracts.messageProcessor.connect(adminSigner)
+                .grantRole(await contracts.messageProcessor.PROCESSOR_ROLE(), deployment.address)
+        );
 
 
         // 2. Grant roles
-        await protocolCoordinator.connect(adminSigner).grantRole(await protocolCoordinator.OPERATOR_ROLE(), admin);
-        await protocolCoordinator.connect(adminSigner).grantRole(await protocolCoordinator.EMERGENCY_ROLE(), admin);
+        // Fetch ProtocolCoordinator roles
+        // Grant roles to admin
+        await helper.waitForTx(
+            await protocolCoordinator.connect(adminSigner)
+                .grantRole(await protocolCoordinator.OPERATOR_ROLE(), admin)
+        );
 
-        await protocolCoordinator.connect(adminSigner).grantRole(
-            await protocolCoordinator.EMERGENCY_ROLE(),
-            admin
+        await helper.waitForTx(
+            await protocolCoordinator.connect(adminSigner)
+                .grantRole(await protocolCoordinator.EMERGENCY_ROLE(), admin)
         );
 
         console.log("================================\n");
@@ -106,10 +128,10 @@ const func: DeployFunction = async function ({
     console.log("\nProtocolCoordinator deployed successfully!");
     console.log("Address:", deployment.address);
     console.log("\nDependencies:");
-    console.log(" - MessageRegistry:", messageRegistry);
-    console.log(" - MessageProtocol:", messageProtocol);
-    console.log(" - MessageRouter:", messageRouter);
-    console.log(" - MessageProcessor:", messageProcessor);
+    console.log(" - MessageRegistry:", addresses.messageRegistry);
+    console.log(" - MessageProtocol:", addresses.messageProtocol);
+    console.log(" - MessageRouter:", addresses.messageRouter);
+    console.log(" - MessageProcessor:", addresses.messageProcessor);
 
     console.log("\nRole Verification:");
     console.log(" - Admin Role:", await protocolCoordinator.hasRole(adminRole, admin));

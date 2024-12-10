@@ -74,3 +74,17 @@ export const loadProtocolConfig = (configName: ConfigNames): ProtocolConfigurati
             );
     }
 };
+
+/**
+* Gets protocol configuration from environment or defaults to Test config
+* @returns Protocol configuration
+*/
+export function getProtocolConfig(): ProtocolConfiguration {
+    const PROTOCOL_CONFIG_NAME = process.env.PROTOCOL_CONFIG_NAME;
+
+    return loadProtocolConfig(
+        PROTOCOL_CONFIG_NAME ?
+            (ConfigNames[PROTOCOL_CONFIG_NAME as keyof typeof ConfigNames] || ConfigNames.Test) :
+            ConfigNames.Test
+    );
+}

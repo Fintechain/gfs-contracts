@@ -4,6 +4,7 @@ import { LiquidityPool, SettlementController } from "../../typechain";
 import { COMMON_DEPLOY_PARAMS } from "../../src/env";
 import { DeploymentHelper } from "../../src/utils/deploy-helper";
 import { CONTRACT_VARIANTS } from "../../src/constants/deployment";
+import { ConfigNames, getProtocolConfig, loadProtocolConfig } from "../../src/utils/config-helpers";
 
 const func: DeployFunction = async function ({
     getNamedAccounts,
@@ -14,7 +15,8 @@ const func: DeployFunction = async function ({
     const { admin } = await getNamedAccounts();
     const environment = { getNamedAccounts, deployments, ...hre };
 
-    const helper = new DeploymentHelper(environment);
+    // Initialize helper with protocol config
+    const helper = new DeploymentHelper(environment, getProtocolConfig());
 
     // Get dependency
     const liquidityPool = await helper.getContractVariantInstance<LiquidityPool>(
@@ -27,6 +29,11 @@ const func: DeployFunction = async function ({
     const deployment = await deploy("SettlementController", {
         from: admin, args: [liquidityPoolAddr], ...COMMON_DEPLOY_PARAMS
     });
+
+
+    if (deployment.receipt) {
+        
+    }
 
     // Get the deployed contract with proper typing
     const settlementController = await helper.getContract<SettlementController>("SettlementController")

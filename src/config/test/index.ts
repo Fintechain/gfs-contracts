@@ -1,7 +1,8 @@
-import { eEthereumNetwork, ICommonConfiguration } from "../../types";
 import { CommonsConfig } from "./common";
+import { TX_CONFIGS } from "./transaction";
+import { eEthereumNetwork, ProtocolConfiguration } from "../../types";
 
-export const EthereumV1TestnetMarket: ICommonConfiguration = {
+export const EthereumV1TestnetMarket: ProtocolConfiguration = {
     ...CommonsConfig,
     MarketId: "GFS Ethereum Testnet Configuration",
     WormHoleCoreContracts: {
@@ -14,6 +15,7 @@ export const EthereumV1TestnetMarket: ICommonConfiguration = {
         [eEthereumNetwork.sepolia]: "0x7B1bD7a6b4E61c2a123AC6BC2cbfC614437D0470",
         [eEthereumNetwork.holesky]: "0x28D8F1Be96f97C1387e94A53e00eCcFb4E75175a",
     },
+    TransactionConfig: TX_CONFIGS
 };
 
 export default EthereumV1TestnetMarket;
