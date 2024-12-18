@@ -168,6 +168,6 @@ func.dependencies = [
 ];
 
 func.id = "ProtocolCoordinator";
-func.tags = ["market", "ProtocolCoordinator"];
+func.tags = ["protocol", "market", "ProtocolCoordinator"];
 
 export default func;

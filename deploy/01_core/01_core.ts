@@ -10,9 +10,8 @@ const func: DeployFunction = async function ({
     const { deploy } = deployments;
     const { admin } = await getNamedAccounts();
 
-    await deploy("TargetRegistry", { from: admin, args: [], log: true });
-    await deploy("MessageProcessor", { from: admin, args: [], log: true });
-    await deploy("LiquidityPool", { from: admin, args: [], ...COMMON_DEPLOY_PARAMS });
+    await deploy("TargetRegistry", { from: admin, args: [], ...COMMON_DEPLOY_PARAMS });
+    await deploy("MessageProcessor", { from: admin, args: [], ...COMMON_DEPLOY_PARAMS });
     await deploy("MessageRegistry", { from: admin, args: [], ...COMMON_DEPLOY_PARAMS });
     await deploy("MessageProtocol", { from: admin, args: [], ...COMMON_DEPLOY_PARAMS });
     await deploy("ProtocolGovernance", { from: admin, args: [], ...COMMON_DEPLOY_PARAMS });
@@ -21,6 +20,6 @@ const func: DeployFunction = async function ({
 };
 
 func.id = "Core";
-func.tags = ["core", "Core"];
+func.tags = ["protocol", "core", "Core"];
 
 export default func;

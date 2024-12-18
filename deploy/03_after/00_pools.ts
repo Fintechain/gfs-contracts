@@ -42,7 +42,7 @@ const func: DeployFunction = async function ({
 };
 
 func.id = "CreateLiquidityPools";
-func.tags = ["CreateLiquidityPools"];
+func.tags = ["protocol", "CreateLiquidityPools"];
 func.dependencies = ["core"];
 
 export default func;

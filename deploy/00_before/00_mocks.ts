@@ -37,7 +37,7 @@ const func: DeployFunction = async function ({
     return true;
 };
 
-func.id = "MessageProtocol";
-func.tags = ["core", "MessageProtocol"];
+func.id = "MockContracts";
+func.tags = ["mocks", "MockContracts"];
 
 export default func;

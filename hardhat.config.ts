@@ -32,10 +32,10 @@ const config: HardhatUserConfig = {
     },
     networks: {
         hardhat: {
-            forking: {
+           /*  forking: {
                 url: SEPOLIA_RPC_URL, // Use Alchemy or Infura URL
                 blockNumber: 7193483
-            },
+            }, */
             accounts: {
                 mnemonic: MNEMONIC,
                 count: 10,
@@ -99,9 +99,9 @@ const config: HardhatUserConfig = {
         deployments: 'deployments',
         tests: 'test',
     },
-    mocha: {
+    /* mocha: {
         timeout: 40000,
-    },
+    }, */
 };
 
 export default config;

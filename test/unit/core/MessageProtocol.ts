@@ -20,7 +20,7 @@ describe("MessageProtocol", function () {
 
     beforeEach(async function () {
         // Deploy contracts
-        await deployments.fixture(['MessageProtocol']);
+        await deployments.fixture(['mocks', 'core']);
 
         // Get named accounts
         const { admin } = await getNamedAccounts();
@@ -84,13 +84,13 @@ describe("MessageProtocol", function () {
         it("Should revert if non-admin tries to register format", async function () {
             await expect(messageProtocol.connect(await ethers.getSigner(validator))
                 .registerMessageFormat(testMessageType, testRequiredFields, testSchema))
-                .to.be.revertedWith("MessageProtocol: Caller must have FORMAT_ADMIN_ROLE");
+                .to.be.rejectedWith("MessageProtocol: Caller must have FORMAT_ADMIN_ROLE");
         });
 
         it("Should revert if schema is empty", async function () {
             await expect(messageProtocol.connect(await ethers.getSigner(formatAdmin))
                 .registerMessageFormat(testMessageType, testRequiredFields, "0x"))
-                .to.be.revertedWith("MessageProtocol: Schema cannot be empty");
+                .to.be.rejectedWith("MessageProtocol: Schema cannot be empty");
         });
     });
 
@@ -123,7 +123,7 @@ describe("MessageProtocol", function () {
         it("Should revert if non-validator tries to validate", async function () {
             await expect(messageProtocol.connect(await ethers.getSigner(formatAdmin))
                 .validateMessage(testMessageType, testPayload))
-                .to.be.revertedWith("MessageProtocol: Caller must have VALIDATOR_ROLE");
+                .to.be.rejectedWith("MessageProtocol: Caller must have VALIDATOR_ROLE");
         });
     });
 
@@ -150,7 +150,7 @@ describe("MessageProtocol", function () {
         it("Should revert if non-admin tries to update version", async function () {
             await expect(messageProtocol.connect(await ethers.getSigner(validator))
                 .updateProtocolVersion(2, 0, 0))
-                .to.be.revertedWith("MessageProtocol: Caller must have PROTOCOL_ADMIN_ROLE");
+                .to.be.rejectedWith("MessageProtocol: Caller must have PROTOCOL_ADMIN_ROLE");
         });
     });
 
@@ -223,7 +223,7 @@ describe("MessageProtocol", function () {
             const newSchema = ethers.toUtf8Bytes("new-schema");
             await expect(messageProtocol.connect(await ethers.getSigner(formatAdmin))
                 .updateMessageSchema(unknownType, newSchema))
-                .to.be.revertedWith("MessageProtocol: Format not registered");
+                .to.be.rejectedWith("MessageProtocol: Format not registered");
         });
     });
 
@@ -247,7 +247,7 @@ describe("MessageProtocol", function () {
 
             await expect(messageProtocol.connect(await ethers.getSigner(formatAdmin))
                 .registerMessageFormat(testMessageType, testRequiredFields, testSchema))
-                .to.be.reverted;
+                .to.be.rejected;
         });
     });
 });

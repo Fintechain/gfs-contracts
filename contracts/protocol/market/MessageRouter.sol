@@ -241,9 +241,9 @@ contract MessageRouter is
         bytes memory payload
     ) private returns (bytes32) {
         // Calculate our processing fee to keep
-        uint256 processingFee = calculateCrossChainProcessingFee(
+       /*  uint256 processingFee = calculateCrossChainProcessingFee(
             payload.length
-        );
+        ); */
 
         // Calculate Wormhole fees
         uint256 gasLimit = chainGasLimits[targetChain] == 0
@@ -262,12 +262,14 @@ contract MessageRouter is
             target,
             payload
         );
-
-        // Send message via Wormhole
-        uint64 sequence = wormhole.publishMessage{value: wormhole.messageFee()}(
-            0, // nonce
+        
+        // Send payload to target chain
+        uint64 sequence = wormholeRelayer.sendPayloadToEvm{value: deliveryCost}(
+            targetChain,
+            target,
             vaaPayload,
-            1 // consistency level
+            0,
+            GAS_LIMIT
         );
 
         return keccak256(abi.encodePacked(sequence, targetChain));

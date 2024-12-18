@@ -153,7 +153,7 @@ contract ProtocolCoordinator is
         );
         require(submission.targetChain > 0, "Invalid chain ID");
         require(submission.payload.length > 0, "Empty payload");
-        
+
         _baseFee = baseFee;
         _deliveryFee = messageRouter.quoteRoutingFee(
             submission.targetChain,

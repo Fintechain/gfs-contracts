@@ -39,7 +39,7 @@ const func: DeployFunction = async function ({
     }
 };
 
-func.tags = ["post-deploy"];
+func.tags = ["protocol", "post-deploy"];
 func.runAtTheEnd = true;
 
 export default func;

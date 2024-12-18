@@ -119,8 +119,8 @@ const func: DeployFunction = async function ({
     return true;
 };
 
-func.dependencies = ["tokens", "core", "market"];
+func.dependencies = ["tokens", "Core", "market"];
 func.id = "PACS008Handler";
-func.tags = ["handlers", "PACS008Handler"];
+func.tags = ["protocol", "handlers", "PACS008Handler"];
 
 export default func;

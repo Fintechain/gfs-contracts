@@ -97,6 +97,6 @@ func.dependencies = [
 ];
 
 func.id = "MessageRouter";
-func.tags = ["market", "MessageRouter"];
+func.tags = ["protocol", "market", "MessageRouter"];
 
 export default func;

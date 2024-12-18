@@ -8,7 +8,7 @@ describe("TargetRegistry", function () {
     const testMetadata = ethers.toUtf8Bytes("test-metadata");
 
     beforeEach(async function () {
-        await deployments.fixture(['TargetRegistry']);
+        await deployments.fixture(['mocks', 'core']);
         const { admin } = await getNamedAccounts();
         const signers = await ethers.getSigners();
         // Validate that there are enough signers for testing
@@ -72,13 +72,13 @@ describe("TargetRegistry", function () {
         it("Should revert if non-registrar tries to register", async function () {
             await expect(targetRegistry.connect(await ethers.getSigner(user))
                 .registerTarget(user, 1, 0, testMetadata))
-                .to.be.revertedWith("TargetRegistry: Must have registrar role");
+                .to.be.rejectedWith("TargetRegistry: Must have registrar role");
         });
 
         it("Should revert with zero address", async function () {
             await expect(targetRegistry.connect(await ethers.getSigner(registrar))
                 .registerTarget(ethers.ZeroAddress, 1, 0, testMetadata))
-                .to.be.revertedWith("TargetRegistry: Invalid address");
+                .to.be.rejectedWith("TargetRegistry: Invalid address");
         });
 
         it("Should revert for duplicate registration", async function () {
@@ -89,7 +89,7 @@ describe("TargetRegistry", function () {
                 
             await expect(targetRegistry.connect(registrarSigner)
                 .registerTarget(user, 1, 0, testMetadata))
-                .to.be.revertedWith("TargetRegistry: Target already registered");
+                .to.be.rejectedWith("TargetRegistry: Target already registered");
         });
 
         it("Should register targets of different types", async function () {
@@ -151,7 +151,7 @@ describe("TargetRegistry", function () {
         it("Should revert status update for non-registered target", async function () {
             await expect(targetRegistry.connect(await ethers.getSigner(registrar))
                 .updateTargetStatus(ethers.Wallet.createRandom().address, false))
-                .to.be.revertedWith("TargetRegistry: Target not registered");
+                .to.be.rejectedWith("TargetRegistry: Target not registered");
         });
     });
 
@@ -179,7 +179,7 @@ describe("TargetRegistry", function () {
         it("Should revert metadata update for non-registered target", async function () {
             await expect(targetRegistry.connect(await ethers.getSigner(registrar))
                 .updateTargetMetadata(ethers.Wallet.createRandom().address, testMetadata))
-                .to.be.revertedWith("TargetRegistry: Target not registered");
+                .to.be.rejectedWith("TargetRegistry: Target not registered");
         });
     });
 
@@ -215,7 +215,7 @@ describe("TargetRegistry", function () {
         it("Should revert registration of zero emitter address", async function () {
             await expect(targetRegistry.connect(await ethers.getSigner(registrar))
                 .registerEmitter(ethers.ZeroHash, 1))
-                .to.be.revertedWith("TargetRegistry: Invalid emitter");
+                .to.be.rejectedWith("TargetRegistry: Invalid emitter");
         });
     });
 
@@ -303,11 +303,11 @@ describe("TargetRegistry", function () {
         it("Should revert pause/unpause from non-admin", async function () {
             await expect(targetRegistry.connect(await ethers.getSigner(registrar))
                 .pause())
-                .to.be.revertedWith("TargetRegistry: Must have admin role");
+                .to.be.rejectedWith("TargetRegistry: Must have admin role");
 
             await expect(targetRegistry.connect(await ethers.getSigner(registrar))
                 .unpause())
-                .to.be.revertedWith("TargetRegistry: Must have admin role");
+                .to.be.rejectedWith("TargetRegistry: Must have admin role");
         });
     });
 

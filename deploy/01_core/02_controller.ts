@@ -5,6 +5,7 @@ import { COMMON_DEPLOY_PARAMS } from "../../src/env";
 import { DeploymentHelper } from "../../src/utils/deploy-helper";
 import { CONTRACT_VARIANTS } from "../../src/constants/deployment";
 import { ConfigNames, getProtocolConfig, loadProtocolConfig } from "../../src/utils/config-helpers";
+import { isUnitMode } from "../../src/utils/deploy-utils";
 
 const func: DeployFunction = async function ({
     getNamedAccounts,
@@ -18,22 +19,18 @@ const func: DeployFunction = async function ({
     // Initialize helper with protocol config
     const helper = new DeploymentHelper(environment, getProtocolConfig());
 
-    // Get dependency
+    // Deploy the LiquidityPool
+    await deploy("LiquidityPool", { from: admin, args: [], ...COMMON_DEPLOY_PARAMS });
+
     const liquidityPool = await helper.getContractVariantInstance<LiquidityPool>(
         CONTRACT_VARIANTS.LiquidityPool
     );
-
     const liquidityPoolAddr = await liquidityPool.getAddress();
 
     // Deploy the SettlementController
     const deployment = await deploy("SettlementController", {
         from: admin, args: [liquidityPoolAddr], ...COMMON_DEPLOY_PARAMS
     });
-
-
-    if (deployment.receipt) {
-        
-    }
 
     // Get the deployed contract with proper typing
     const settlementController = await helper.getContract<SettlementController>("SettlementController")
@@ -53,12 +50,9 @@ const func: DeployFunction = async function ({
 };
 
 // Dependencies
-func.dependencies = [
-    "tokens",
-    "core",
-];
+func.dependencies = ["tokens",];
 
 func.id = "SettlementController";
-func.tags = ["market", "SettlementController"];
+func.tags = ["protocol", "market", "SettlementController"];
 
 export default func;

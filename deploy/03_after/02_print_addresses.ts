@@ -18,7 +18,7 @@ const func: DeployFunction = async function ({
     console.log("\n================================\n");
 };
 
-func.tags = ["print-addresses"];
+func.tags = ["protocol", "print-addresses"];
 func.runAtTheEnd = true;
 
 export default func;

@@ -19,7 +19,7 @@ describe("MessageRegistry", function () {
     let registrar: string, processor: string, user: string;
 
     beforeEach(async function () {
-        await deployments.fixture(['MessageRegistry']);
+        await deployments.fixture(['mocks', 'core']);
 
         const { admin } = await getNamedAccounts();
         const signers = await ethers.getSigners();
@@ -98,19 +98,19 @@ describe("MessageRegistry", function () {
         it("Should revert if non-registrar tries to register", async function () {
             await expect(messageRegistry.connect(await ethers.getSigner(user))
                 .registerMessage(testMessageType, testMessageHash, user, 1, testPayload))
-                .to.be.revertedWith("MessageRegistry: Must have registrar role");
+                .to.be.rejectedWith("MessageRegistry: Must have registrar role");
         });
 
         it("Should revert with zero address target", async function () {
             await expect(messageRegistry.connect(await ethers.getSigner(registrar))
                 .registerMessage(testMessageType, testMessageHash, ethers.ZeroAddress, 1, testPayload))
-                .to.be.revertedWith("MessageRegistry: Invalid target address");
+                .to.be.rejectedWith("MessageRegistry: Invalid target address");
         });
 
         it("Should revert with empty payload", async function () {
             await expect(messageRegistry.connect(await ethers.getSigner(registrar))
                 .registerMessage(testMessageType, testMessageHash, user, 1, "0x"))
-                .to.be.revertedWith("MessageRegistry: Empty payload");
+                .to.be.rejectedWith("MessageRegistry: Empty payload");
         });
     });
 
@@ -155,7 +155,7 @@ describe("MessageRegistry", function () {
         it("Should revert invalid status transitions", async function () {
             await expect(messageRegistry.connect(await ethers.getSigner(processor))
                 .updateMessageStatus(messageId, MessageStatus.SETTLED))
-                .to.be.revertedWith("MessageRegistry: Invalid status transition");
+                .to.be.rejectedWith("MessageRegistry: Invalid status transition");
         });
     });
 
@@ -317,13 +317,13 @@ describe("MessageRegistry", function () {
             const userSigner = await ethers.getSigner(user);
 
             await expect(messageRegistry.connect(userSigner).pause())
-                .to.be.revertedWith("MessageRegistry: Must have admin role");
+                .to.be.rejectedWith("MessageRegistry: Must have admin role");
 
             await expect(messageRegistry.connect(userSigner).unpause())
-                .to.be.revertedWith("MessageRegistry: Must have admin role");
+                .to.be.rejectedWith("MessageRegistry: Must have admin role");
 
             await expect(messageRegistry.connect(userSigner).clearMessageIndex(user, true))
-                .to.be.revertedWith("MessageRegistry: Must have admin role");
+                .to.be.rejectedWith("MessageRegistry: Must have admin role");
         });
     });
 
@@ -413,7 +413,7 @@ describe("MessageRegistry", function () {
     
                 await expect(messageRegistry.connect(processorSigner)
                     .updateMessageStatus(messageId, MessageStatus.FAILED))
-                    .to.be.revertedWith("MessageRegistry: Invalid status transition");
+                    .to.be.rejectedWith("MessageRegistry: Invalid status transition");
     
                 expect(await messageRegistry.isMessageProcessed(messageId)).to.be.true;
             });

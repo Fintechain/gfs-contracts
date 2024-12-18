@@ -15,7 +15,7 @@ describe("LiquidityPool", function () {
     const testSettlementId = ethers.id("TEST_SETTLEMENT");
 
     beforeEach(async function () {
-        await deployments.fixture(['LiquidityPool']);
+        await deployments.fixture(['tokens', 'mocks', 'SettlementController']);
 
         const { admin } = await getNamedAccounts();
 

@@ -10,7 +10,7 @@ describe("MessageProcessor", function () {
     let processor:string, msgHandlerAdmin: string ;
 
     beforeEach(async function () {
-        await deployments.fixture(['MessageProcessor']);
+        await deployments.fixture(['mocks', 'core']);
 
         const { admin } = await getNamedAccounts();
         const signers = await ethers.getSigners();
@@ -69,7 +69,7 @@ describe("MessageProcessor", function () {
 
             await expect(messageProcessor.connect(await ethers.getSigner(processor))
                 .registerMessageHandler(testMessageType, mockHandler))
-                .to.be.revertedWith("MessageProcessor: Must have handler admin role");
+                .to.be.rejectedWith("MessageProcessor: Must have handler admin role");
         });
     });
 
@@ -128,7 +128,7 @@ describe("MessageProcessor", function () {
 
             await expect(messageProcessor.connect(await ethers.getSigner(processor))
                 .processMessage(testMessageId, testMessageType, testPayload))
-                .to.be.revertedWith("MessageProcessor: Message already processed");
+                .to.be.rejectedWith("MessageProcessor: Message already processed");
         });
     });
 
@@ -145,7 +145,7 @@ describe("MessageProcessor", function () {
 
             await expect(messageProcessor.connect(await ethers.getSigner(processor))
                 .processMessage(testMessageId, testMessageType, testPayload))
-                .to.be.reverted;
+                .to.be.rejected;
         });
 
         it("Should allow admin to unpause", async function () {

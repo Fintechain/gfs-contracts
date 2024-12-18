@@ -9,7 +9,7 @@ describe("ProtocolGovernance", function () {
     const testProposalData = ethers.toUtf8Bytes("test-proposal");
 
     beforeEach(async function () {
-        await deployments.fixture(['ProtocolGovernance']);
+        await deployments.fixture(['mocks', 'core']);
 
         const { admin } = await getNamedAccounts();
 
@@ -80,13 +80,13 @@ describe("ProtocolGovernance", function () {
         it("Should revert if non-governor tries to create proposal", async function () {
             await expect(protocolGovernance.connect(await ethers.getSigner(voter))
                 .createProposal(0, testProposalData))
-                .to.be.revertedWith("ProtocolGovernance: Must have governor role");
+                .to.be.rejectedWith("ProtocolGovernance: Must have governor role");
         });
 
         it("Should revert with empty proposal data", async function () {
             await expect(protocolGovernance.connect(await ethers.getSigner(governor))
                 .createProposal(0, "0x"))
-                .to.be.revertedWith("ProtocolGovernance: Empty proposal data");
+                .to.be.rejectedWith("ProtocolGovernance: Empty proposal data");
         });
 
         it("Should store proposal details correctly", async function () {
@@ -140,7 +140,7 @@ describe("ProtocolGovernance", function () {
         it("Should revert if voter has no voting power", async function () {
             await expect(protocolGovernance.connect(await ethers.getSigner(executor))
                 .vote(proposalId, true))
-                .to.be.revertedWith("ProtocolGovernance: No voting power");
+                .to.be.rejectedWith("ProtocolGovernance: No voting power");
         });
 
         it("Should revert on duplicate vote", async function () {
@@ -151,14 +151,14 @@ describe("ProtocolGovernance", function () {
 
             await expect(protocolGovernance.connect(await ethers.getSigner(voter))
                 .vote(proposalId, true))
-                .to.be.revertedWith("ProtocolGovernance: Already voted");
+                .to.be.rejectedWith("ProtocolGovernance: Already voted");
         });
 
         it("Should revert after voting period ends", async function () {
             await time.increase(7 * 24 * 60 * 60 + 1);
             await expect(protocolGovernance.connect(await ethers.getSigner(voter))
                 .vote(proposalId, true))
-                .to.be.revertedWith("ProtocolGovernance: Voting period ended");
+                .to.be.rejectedWith("ProtocolGovernance: Voting period ended");
         });
 
         it("Should track hasVoted correctly", async function () {
@@ -207,14 +207,14 @@ describe("ProtocolGovernance", function () {
         it("Should revert execution before voting period ends", async function () {
             await expect(protocolGovernance.connect(await ethers.getSigner(executor))
                 .executeProposal(1))
-                .to.be.revertedWith("ProtocolGovernance: Voting period not ended");
+                .to.be.rejectedWith("ProtocolGovernance: Voting period not ended");
         });
 
         it("Should revert execution without quorum", async function () {
             await time.increase(9 * 24 * 60 * 60 + 1);
             await expect(protocolGovernance.connect(await ethers.getSigner(executor))
                 .executeProposal(1))
-                .to.be.revertedWith("ProtocolGovernance: Quorum not reached");
+                .to.be.rejectedWith("ProtocolGovernance: Quorum not reached");
         });
 
         it("Should revert execution before delay period", async function () {
@@ -228,7 +228,7 @@ describe("ProtocolGovernance", function () {
             
             await expect(protocolGovernance.connect(await ethers.getSigner(executor))
                 .executeProposal(1))
-                .to.be.revertedWith("ProtocolGovernance: Execution delay not passed");
+                .to.be.rejectedWith("ProtocolGovernance: Execution delay not passed");
         });
 
         it("Should revert duplicate execution", async function () {
@@ -248,7 +248,7 @@ describe("ProtocolGovernance", function () {
                 
             await expect(protocolGovernance.connect(await ethers.getSigner(executor))
                 .executeProposal(1))
-                .to.be.revertedWith("ProtocolGovernance: Already executed");
+                .to.be.rejectedWith("ProtocolGovernance: Already executed");
         });
     });
 
@@ -267,13 +267,13 @@ describe("ProtocolGovernance", function () {
         it("Should revert if non-emergency role tries to execute", async function () {
             await expect(protocolGovernance.connect(await ethers.getSigner(voter))
                 .executeEmergencyAction(emergencyAction))
-                .to.be.revertedWith("ProtocolGovernance: Must have emergency role");
+                .to.be.rejectedWith("ProtocolGovernance: Must have emergency role");
         });
 
         it("Should revert with empty action data", async function () {
             await expect(protocolGovernance.connect(await ethers.getSigner(executor))
                 .executeEmergencyAction("0x"))
-                .to.be.revertedWith("ProtocolGovernance: Empty action data");
+                .to.be.rejectedWith("ProtocolGovernance: Empty action data");
         });
 
         it("Should revert duplicate emergency action", async function () {
@@ -286,7 +286,7 @@ describe("ProtocolGovernance", function () {
                 
             await expect(protocolGovernance.connect(await ethers.getSigner(executor))
                 .executeEmergencyAction(emergencyAction))
-                .to.be.revertedWith("ProtocolGovernance: Action already executed");
+                .to.be.rejectedWith("ProtocolGovernance: Action already executed");
         });
     });
 
@@ -305,7 +305,7 @@ describe("ProtocolGovernance", function () {
         it("Should revert if non-admin tries to update voting power", async function () {
             await expect(protocolGovernance.connect(await ethers.getSigner(voter))
                 .updateVotingPower(voter, 200))
-                .to.be.revertedWith("ProtocolGovernance: Must have admin role");
+                .to.be.rejectedWith("ProtocolGovernance: Must have admin role");
         });
     });
 
@@ -328,7 +328,7 @@ describe("ProtocolGovernance", function () {
         it("Should revert if non-emergency role tries to pause", async function () {
             await expect(protocolGovernance.connect(await ethers.getSigner(voter))
                 .pause())
-                .to.be.revertedWith("ProtocolGovernance: Must have emergency role");
+                .to.be.rejectedWith("ProtocolGovernance: Must have emergency role");
         });
 
         it("Should prevent proposal creation when paused", async function () {
