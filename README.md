@@ -1,4 +1,4 @@
-# GFS Protocol: Decentralized ISO20022 Messaging Network
+# GFS Protocol: Decentralized ISO20022 Messaging Network.
 <!-- [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 [![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)]()
