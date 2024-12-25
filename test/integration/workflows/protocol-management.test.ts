@@ -77,7 +77,7 @@ describe('Protocol Management Tests', () => {
             await expect(
                 contracts.protocolCoordinator.connect(admin)
                     .updateProtocolComponent(registryComponent, ethers.ZeroAddress)
-            ).to.be.rejectedWith('Invalid address');
+            ).to.be.rejectedWith('invalid address');
         });
 
         it('should reject invalid component types', async () => {
@@ -86,7 +86,7 @@ describe('Protocol Management Tests', () => {
             await expect(
                 contracts.protocolCoordinator.connect(admin)
                     .updateProtocolComponent(invalidComponent, newComponent.address)
-            ).to.be.rejectedWith('Invalid component');
+            ).to.be.rejectedWith('invalid component');
         });
     });
 
@@ -143,7 +143,7 @@ describe('Protocol Management Tests', () => {
             await expect(
                 contracts.protocolCoordinator.connect(sender)
                     .submitMessage(submission, { value: oldFee })
-            ).to.be.rejectedWith('Insufficient fee');
+            ).to.be.rejectedWith('insufficient fee');
         });
     });
 
@@ -199,7 +199,7 @@ describe('Protocol Management Tests', () => {
         it('should enforce emergency role for pause', async () => {
             await expect(
                 contracts.protocolCoordinator.connect(sender).pause()
-            ).to.be.rejectedWith('Caller not emergency admin');
+            ).to.be.rejectedWith('caller not emergency admin');
         });
 
         it('should enforce admin role for unpause', async () => {
@@ -209,7 +209,7 @@ describe('Protocol Management Tests', () => {
             // Attempt unpause as non-admin
             await expect(
                 contracts.protocolCoordinator.connect(sender).unpause()
-            ).to.be.rejectedWith('Caller not admin');
+            ).to.be.rejectedWith('caller not admin');
         });
     });
 
@@ -231,7 +231,7 @@ describe('Protocol Management Tests', () => {
             await expect(
                 contracts.protocolCoordinator.connect(sender)
                     .emergencyCancelMessage(ethers.ZeroHash)
-            ).to.be.rejectedWith('Caller not emergency admin');
+            ).to.be.rejectedWith('caller not emergency admin');
         });
 
         it('should enforce role-based access for admin actions', async () => {
@@ -241,7 +241,7 @@ describe('Protocol Management Tests', () => {
             await expect(
                 contracts.protocolCoordinator.connect(sender)
                     .updateProtocolComponent(registryComponent, newComponent.address)
-            ).to.be.rejectedWith('Caller not admin');
+            ).to.be.rejectedWith('caller not admin');
         });
 
         it('should allow admin to grant roles', async () => {

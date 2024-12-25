@@ -173,7 +173,7 @@ contract LiquidityPool is
         address token,
         uint256 amount,
         address recipient
-    ) external override whenNotPaused {
+    ) external override nonReentrant whenNotPaused {
         require(
             hasRole(SETTLEMENT_ROLE, msg.sender),
             "LiquidityPool: Must have settlement role"
@@ -184,14 +184,13 @@ contract LiquidityPool is
         // Lock liquidity first
         _lockLiquidity(token, amount, settlementId);
 
-        // Do the transfer before updating pool state for locked liquidity
-        IERC20(token).safeTransfer(recipient, amount);
-
         // Update pool state to reflect the settlement
         PoolInfo storage pool = pools[token];
         pool.totalLiquidity -= amount; // Add this line
         pool.lockedLiquidity -= amount; // Release the locked liquidity immediately
 
+        // Do the transfer before updating pool state for locked liquidity
+        IERC20(token).safeTransfer(recipient, amount);
         emit SettlementCompleted(settlementId, amount, recipient);
     }
 

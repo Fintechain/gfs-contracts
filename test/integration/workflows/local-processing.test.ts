@@ -82,7 +82,7 @@ describe('Local Message Processing Tests', () => {
                     invalidSubmission,
                     { value: baseFee + deliveryFee }
                 )
-            ).to.be.rejectedWith('Invalid target');
+            ).to.be.rejectedWith('invalid target');
         });
 
         it('should enforce message protocol validation', async () => {
@@ -96,7 +96,7 @@ describe('Local Message Processing Tests', () => {
                     invalidSubmission,
                     { value: baseFee + deliveryFee }
                 )
-            ).to.be.rejectedWith('Invalid message format');
+            ).to.be.rejectedWith('invalid message format');
         });
     });
 
@@ -144,7 +144,7 @@ describe('Local Message Processing Tests', () => {
             // Try to cancel from different address
             await expect(
                 contracts.protocolCoordinator.connect(receiver).cancelMessage(messageId)
-            ).to.be.rejectedWith('Not message sender');
+            ).to.be.rejectedWith('not message sender');
         });
     });
     
@@ -200,7 +200,7 @@ describe('Local Message Processing Tests', () => {
         it('should prevent non-admin emergency cancellation', async () => {
             await expect(
                 contracts.protocolCoordinator.connect(sender).emergencyCancelMessage(messageId)
-            ).to.be.rejectedWith('Caller not emergency admin');
+            ).to.be.rejectedWith('caller not emergency admin');
         });
     });
 

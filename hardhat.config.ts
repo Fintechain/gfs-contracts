@@ -77,7 +77,10 @@ const config: HardhatUserConfig = {
             chainId: 11155111,
             live: true,
             saveDeployments: true,
-            timeout: 60000,                 // Increase timeout to 60 seconds
+            timeout: 120000,           // Increase timeout to 120 seconds
+            gasMultiplier: 1.2,        // Add safety margin for gas estimation
+            confirmations: 2,          // Wait for more confirmations
+            blockGasLimit: 12000000    // Set explicit gas limit
         },
 
         holesky: {
