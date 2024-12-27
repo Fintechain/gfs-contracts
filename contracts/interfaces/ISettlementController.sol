@@ -25,6 +25,7 @@ interface ISettlementController {
         address recipient;        // Settlement recipient
         SettlementStatus status;  // Current status
         uint256 timestamp;        // Settlement timestamp
+        uint256 deadline;         //Settlement deadline
     }
 
     /// @notice Emitted when settlement is processed
@@ -33,7 +34,28 @@ interface ISettlementController {
         bytes32 indexed messageId,
         uint256 amount,
         address recipient
+
+        bytes32 public constant SETTLEMENT_PROCESSOR_ROLE = keccak256("SETTLEMENT_PROCESSOR_ROLE");
+
+
+modifier onlySettlementProcessor() {
+    require(hasRole(SETTLEMENT_PROCESSOR_ROLE, msg.sender), "Caller is not a settlement processor");
+    _;
+}
+
+// Apply modifier to the processSettlement function
+function processSettlement(
+    bytes32 messageId,
+    address token,
+    uint256 amount,
+    address recipient
+) external onlySettlementProcessor returns (bytes32 settlementId);
+
     );
+
+   
+
+
 
     /// @notice Emitted when settlement status changes
     event SettlementStatusUpdated(
